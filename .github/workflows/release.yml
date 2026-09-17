@@ -160,11 +160,12 @@ jobs:
             TAG_NAME="v${APP_VERSION}"
           fi
 
-          if ! gh release view "${TAG_NAME}" >/dev/null 2>&1; then
+          if ! gh release view "${TAG_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
             gh release create "${TAG_NAME}" \
+              --repo "${GITHUB_REPOSITORY}" \
               --target "${GITHUB_SHA}" \
               --title "Sapphire Box ${APP_VERSION}" \
               --notes "Sapphire Box ${APP_VERSION}"
           fi
 
-          gh release upload "${TAG_NAME}" release/* --clobber
+          gh release upload "${TAG_NAME}" release/* --clobber --repo "${GITHUB_REPOSITORY}"
