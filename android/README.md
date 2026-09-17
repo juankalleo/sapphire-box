@@ -22,6 +22,8 @@ Isso significa:
 
 Os arquivos ficam no armazenamento interno do app Android. A permissão de internet serve para acessar as fontes/scrapers.
 
+Compatibilidade esperada: Android 7.0+ (`minSdk 24`), com APK universal para `armeabi-v7a`, `arm64-v8a`, `x86` e `x86_64`.
+
 ## Build Local
 
 Abra a pasta `android/` no Android Studio e rode o módulo `:app`.
