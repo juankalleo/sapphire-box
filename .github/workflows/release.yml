@@ -168,4 +168,15 @@ jobs:
               --notes "Sapphire Box ${APP_VERSION}"
           fi
 
-          gh release upload "${TAG_NAME}" release/* --clobber --repo "${GITHUB_REPOSITORY}"
+          release_files=(
+            "release/SapphireBox-Android-1.0.0.apk"
+            "release/SapphireBox-Windows-x64.exe"
+            "release/SapphireBox-macOS-x64"
+            "release/SapphireBox-Linux-x64"
+            "release/sapphirebox-${APP_VERSION}-py3-none-any.whl"
+          )
+
+          for file in "${release_files[@]}"; do
+            test -f "${file}"
+            gh release upload "${TAG_NAME}" "${file}" --clobber --repo "${GITHUB_REPOSITORY}"
+          done

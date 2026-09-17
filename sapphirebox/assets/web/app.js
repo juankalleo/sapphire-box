@@ -262,8 +262,43 @@ el.themeSegmented.addEventListener("click", (evt) => {
 });
 
 // ---- helpers ----
+function isAndroidApiRequest(url) {
+  if (!window.SapphireBoxAndroid) return false;
+  try {
+    return new URL(url, window.location.href).pathname.startsWith("/api/");
+  } catch (err) {
+    return false;
+  }
+}
+
+function bytesFromBase64(value) {
+  const raw = atob(value || "");
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i += 1) {
+    bytes[i] = raw.charCodeAt(i);
+  }
+  return bytes;
+}
+
+async function apiFetch(url, options = {}) {
+  if (!isAndroidApiRequest(url)) return fetch(url, options);
+  const payload = {
+    method: (options.method || "GET").toUpperCase(),
+    url: new URL(url, window.location.href).pathname + new URL(url, window.location.href).search,
+    body: options.body || null,
+  };
+  const raw = window.SapphireBoxAndroid.request(JSON.stringify(payload));
+  const response = JSON.parse(raw);
+  const body = response.bodyBase64 ? bytesFromBase64(response.bodyBase64) : (response.body || "");
+  return new Response(body, {
+    status: response.status || 200,
+    statusText: response.statusText || "OK",
+    headers: response.headers || {},
+  });
+}
+
 async function fetchJSON(url, options) {
-  const res = await fetch(url, options);
+  const res = await apiFetch(url, options);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.detail || `${res.status} ${res.statusText}`);
@@ -1890,7 +1925,7 @@ function openBookReader(item) {
     // Fetching the bytes ourselves and handing epub.js the ArrayBuffer
     // sidesteps its URL heuristics entirely — it accepts binary data
     // directly just as well as a URL.
-    fetch(fileUrl)
+    apiFetch(fileUrl)
       .then((resp) => {
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         return resp.arrayBuffer();

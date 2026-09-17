@@ -113,14 +113,14 @@ sapphirebox library books
 
 ## Android 1.0
 
-O APK Android funciona sozinho. Ele embute o runtime Python via Chaquopy, inicia o servidor local dentro do próprio app e abre a mesma interface pelo WebView em `127.0.0.1`. Não precisa publicar o web, ligar um PC ou informar IP manualmente.
+O APK Android funciona sozinho. Ele embute a interface web e o runtime Python via Chaquopy, abre os assets locais pelo WebView e chama a API por uma ponte nativa Android/Python. Não sobe servidor local, não usa `127.0.0.1`, não precisa publicar o web, ligar um PC ou informar IP manualmente.
 
 1. Baixe `SapphireBox-Android-1.0.0.apk` na release.
 2. Instale no Android.
-3. Abra o app e aguarde a inicialização local.
+3. Abra o app.
 4. Use busca, leitura e downloads pelo próprio celular.
 
-Os dados ficam no armazenamento interno do app Android. A permissão de internet é usada pelas fontes/scrapers.
+Os dados ficam no armazenamento interno do app Android. A biblioteca e os arquivos já baixados abrem offline; a permissão de internet é usada só para buscar/baixar conteúdo nas fontes.
 
 ## Desktop Releases
 

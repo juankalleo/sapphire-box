@@ -1,8 +1,8 @@
 <resources>
     <string name="app_name">Sapphire Box</string>
     <string name="android_version">Android APK v1.0.0 standalone</string>
-    <string name="server_label">O APK inicia o Sapphire Box dentro do próprio Android. A interface, busca, banco e downloads rodam no aparelho.</string>
+    <string name="server_label">O Sapphire Box abre a biblioteca offline direto no Android. A internet só é usada quando você busca ou baixa conteúdo novo.</string>
     <string name="connect">Tentar novamente</string>
-    <string name="server_help">Iniciando o servidor local do Sapphire Box...</string>
-    <string name="server_error">Falha ao iniciar o Sapphire Box: %1$s</string>
+    <string name="server_help">Abrindo biblioteca offline...</string>
+    <string name="server_error">Falha ao abrir o Sapphire Box: %1$s</string>
 </resources>

@@ -62,7 +62,6 @@ chaquopy {
             install("pydantic<2")
             install("rich>=13.7")
             install("typer>=0.12")
-            install("uvicorn>=0.29")
         }
     }
 }
@@ -71,5 +70,6 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.activity:activity-ktx:1.9.2")
+    implementation("androidx.webkit:webkit:1.12.1")
     implementation("com.google.android.material:material:1.12.0")
 }
