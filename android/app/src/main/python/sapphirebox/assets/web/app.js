@@ -117,6 +117,7 @@ const el = {
   pageNext: document.getElementById("page-next"),
   pageIndicator: document.getElementById("page-indicator"),
   libraryPathInput: document.getElementById("library-path-input"),
+  libraryPathBrowse: document.getElementById("library-path-browse"),
   libraryPathSave: document.getElementById("library-path-save"),
   libraryPathHint: document.getElementById("library-path-hint"),
   settingsClearLibrary: document.getElementById("settings-clear-library"),
@@ -1323,9 +1324,9 @@ async function loadSettings() {
   }
 }
 
-el.libraryPathSave.addEventListener("click", async () => {
-  const path = el.libraryPathInput.value.trim();
+async function saveLibraryPath(path) {
   if (!path) return;
+  el.libraryPathInput.value = path;
   el.libraryPathHint.textContent = "Salvando…";
   try {
     const data = await fetchJSON("/api/settings/library-path", {
@@ -1340,7 +1341,33 @@ el.libraryPathSave.addEventListener("click", async () => {
   } catch (err) {
     el.libraryPathHint.textContent = `Falhou: ${err.message}`;
   }
+}
+
+el.libraryPathSave.addEventListener("click", () => {
+  saveLibraryPath(el.libraryPathInput.value.trim());
 });
+
+// ---- Android native folder picker (Storage Access Framework) ----
+// Only shown when the WebView bridge exposes it — desktop/browser preview
+// keeps the plain text field as the only way to set the path.
+if (window.SapphireBoxAndroid && typeof window.SapphireBoxAndroid.hasFolderPicker === "function" && window.SapphireBoxAndroid.hasFolderPicker()) {
+  el.libraryPathBrowse.hidden = false;
+  el.libraryPathBrowse.addEventListener("click", () => {
+    el.libraryPathHint.textContent = "Escolhendo pasta…";
+    window.SapphireBoxAndroid.pickFolder();
+  });
+}
+
+// Called by MainActivity.kt once the user finishes the native folder
+// picker (and, if needed, grants "acesso a todos os arquivos" first).
+window.onSapphireBoxFolderPicked = (path) => {
+  saveLibraryPath(path);
+};
+
+window.onSapphireBoxFolderPickFailed = () => {
+  el.libraryPathHint.textContent =
+    "Não deu pra usar essa pasta. Se apareceu a tela de permissão, aceite \"Acesso a todos os arquivos\" e tente de novo — ou digite o caminho manualmente.";
+};
 
 el.settingsClearLibrary.addEventListener("click", async () => {
   const ok = confirm("Apagar todos os mangás, quadrinhos e livros baixados do disco? Essa ação remove os arquivos da biblioteca local.");

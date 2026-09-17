@@ -133,18 +133,24 @@ def search(query: str) -> list[Manga]:
 
     seen_ids: set[str] = set()
     merged: list[Manga] = []
+    last_error: str | None = None
     with new_client(timeout=12) as client:
         for url in candidates:
             try:
                 resp = client.get(url)
-            except httpx.HTTPError:
+            except httpx.HTTPError as exc:
+                last_error = f"request error for {url}: {exc}"
                 continue
             if resp.status_code != 200:
+                last_error = f"http status {resp.status_code} for {url}"
                 continue
             for manga in _parse_cards(resp.text, q):
                 if manga.id not in seen_ids:
                     seen_ids.add(manga.id)
                     merged.append(manga)
+
+    if not merged and last_error:
+        raise RuntimeError(f"Niadd scraping failed: {last_error}")
 
     return merged[:80]
 

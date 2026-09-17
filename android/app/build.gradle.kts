@@ -56,6 +56,7 @@ chaquopy {
         version = "3.11"
         pip {
             install("beautifulsoup4>=4.12")
+            install("certifi")
             install("fastapi>=0.110,<0.120")
             install("httpx>=0.27")
             install("platformdirs>=4.2")

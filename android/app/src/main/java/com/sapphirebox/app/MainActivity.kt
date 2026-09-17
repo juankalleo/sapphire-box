@@ -1,8 +1,16 @@
 package com.sapphirebox.app
 
+import android.Manifest
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.DocumentsContract
+import android.provider.Settings
 import android.util.Base64
 import android.view.View
 import android.webkit.JavascriptInterface
@@ -15,12 +23,16 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.webkit.WebViewAssetLoader
 import com.chaquo.python.PyObject
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import java.io.ByteArrayInputStream
+import java.io.File
 import org.json.JSONObject
 
 class MainActivity : AppCompatActivity() {
@@ -34,9 +46,40 @@ class MainActivity : AppCompatActivity() {
     private val pythonLock = Any()
     private var pythonBridge: PyObject? = null
 
+    // Folder-picker flow (Storage Access Framework, gated behind "all files
+    // access" so the resolved path is a real filesystem path Python can
+    // write into directly — see resolvePickedFolder below).
+    private lateinit var openTreeLauncher: ActivityResultLauncher<Uri?>
+    private lateinit var allFilesAccessLauncher: ActivityResultLauncher<Intent>
+    private lateinit var legacyStoragePermissionLauncher: ActivityResultLauncher<String>
+    private var pendingFolderPickAfterPermission = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        openTreeLauncher = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+            if (uri == null) {
+                notifyFolderPickFailed()
+                return@registerForActivityResult
+            }
+            val resolved = resolvePickedFolder(uri)
+            if (resolved != null) notifyFolderPicked(resolved) else notifyFolderPickFailed()
+        }
+        allFilesAccessLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            if (!pendingFolderPickAfterPermission) return@registerForActivityResult
+            pendingFolderPickAfterPermission = false
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager()) {
+                openTreeLauncher.launch(null)
+            } else {
+                notifyFolderPickFailed()
+            }
+        }
+        legacyStoragePermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (!pendingFolderPickAfterPermission) return@registerForActivityResult
+            pendingFolderPickAfterPermission = false
+            if (granted) openTreeLauncher.launch(null) else notifyFolderPickFailed()
+        }
 
         webView = findViewById(R.id.webview)
         setupForm = findViewById(R.id.setup_form)
@@ -225,6 +268,91 @@ class MainActivity : AppCompatActivity() {
             .put("body", body.toString())
     }
 
+    private fun beginFolderPick() {
+        when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> {
+                if (Environment.isExternalStorageManager()) {
+                    openTreeLauncher.launch(null)
+                } else {
+                    pendingFolderPickAfterPermission = true
+                    val perAppIntent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    try {
+                        allFilesAccessLauncher.launch(perAppIntent)
+                    } catch (_: ActivityNotFoundException) {
+                        // Some OEM ROMs don't ship the per-app screen — fall
+                        // back to the general "all files access" settings list.
+                        try {
+                            allFilesAccessLauncher.launch(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+                        } catch (_: ActivityNotFoundException) {
+                            pendingFolderPickAfterPermission = false
+                            notifyFolderPickFailed()
+                        }
+                    }
+                }
+            }
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> {
+                // Android 10: MANAGE_EXTERNAL_STORAGE doesn't exist yet and
+                // this app's targetSdk makes it a full scoped-storage app on
+                // this one OS version, so writes outside the app's own
+                // directories may still fail here — resolvePickedFolder's
+                // caller handles that the same as any other failure.
+                openTreeLauncher.launch(null)
+            }
+            else -> {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+                    openTreeLauncher.launch(null)
+                } else {
+                    pendingFolderPickAfterPermission = true
+                    legacyStoragePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                }
+            }
+        }
+    }
+
+    /** Resolves a SAF tree Uri to a plain filesystem path. Only works for
+     * the primary storage volume — layout for SD cards and other secondary
+     * volumes isn't standardized across devices, so those are left
+     * unsupported (caller falls back to the manual path field) rather than
+     * guessing a path that might not exist. */
+    private fun resolvePickedFolder(treeUri: Uri): String? {
+        try {
+            contentResolver.takePersistableUriPermission(
+                treeUri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+        } catch (_: SecurityException) {
+            // Not fatal on its own — still try to use the resolved path below.
+        }
+
+        val docId = try {
+            DocumentsContract.getTreeDocumentId(treeUri)
+        } catch (_: Exception) {
+            return null
+        }
+        val split = docId.split(":", limit = 2)
+        if (split.size != 2 || !split[0].equals("primary", ignoreCase = true)) return null
+
+        val root = Environment.getExternalStorageDirectory()
+        val relativePath = split[1]
+        val folder = if (relativePath.isBlank()) root else File(root, relativePath)
+        return folder.absolutePath
+    }
+
+    private fun notifyFolderPicked(path: String) {
+        val escaped = JSONObject.quote(path)
+        webView.post {
+            webView.evaluateJavascript("window.onSapphireBoxFolderPicked && window.onSapphireBoxFolderPicked($escaped)", null)
+        }
+    }
+
+    private fun notifyFolderPickFailed() {
+        webView.post {
+            webView.evaluateJavascript("window.onSapphireBoxFolderPickFailed && window.onSapphireBoxFolderPickFailed()", null)
+        }
+    }
+
     private fun showStartup(message: String, isError: Boolean, allowRetry: Boolean = true) {
         webView.visibility = View.GONE
         serverStatus.text = message
@@ -241,6 +369,17 @@ class MainActivity : AppCompatActivity() {
             } catch (error: Throwable) {
                 errorResponse(error).toString()
             }
+        }
+
+        @JavascriptInterface
+        fun hasFolderPicker(): Boolean = true
+
+        // @JavascriptInterface methods run on a background WebView thread;
+        // the picker launches an Activity/Intent, which must happen on the
+        // main thread.
+        @JavascriptInterface
+        fun pickFolder() {
+            runOnUiThread { beginFolderPick() }
         }
     }
 }

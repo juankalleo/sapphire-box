@@ -4,8 +4,10 @@ sniffing."""
 from __future__ import annotations
 
 import re
+import ssl
 from pathlib import Path
 
+import certifi
 import httpx
 from bs4.element import Tag
 
@@ -29,12 +31,57 @@ _IMAGE_MAGIC = (
     (b"GIF89a", "gif"),
 )
 
+# Chaquopy (Python embedded in the Android app) ships its own OpenSSL and
+# only trusts certifi's bundled CA file out of the box. That bundle is
+# frozen at whatever version was resolved when the APK was last built, so
+# it can miss a root/intermediate a site rotates onto later and every
+# HTTPS request then dies with CERTIFICATE_VERIFY_FAILED — which is
+# invisible from a desktop dev machine using its OS's own up-to-date
+# trust store. Android itself keeps a full, current CA trust store as
+# plain PEM files, world-readable with no permission needed, at the paths
+# below — load those on top of certifi so the embedded interpreter trusts
+# the same roots the rest of the phone (browser, other apps) already
+# does. This is a no-op on desktop/CI since neither path exists there.
+_ANDROID_SYSTEM_CA_DIRS = (
+    "/apex/com.android.conscrypt/cacerts",
+    "/system/etc/security/cacerts",
+)
+
+_ssl_context: ssl.SSLContext | None = None
+
+
+def _build_ssl_context() -> ssl.SSLContext:
+    global _ssl_context
+    if _ssl_context is not None:
+        return _ssl_context
+
+    ctx = ssl.create_default_context(cafile=certifi.where())
+    for cert_dir in _ANDROID_SYSTEM_CA_DIRS:
+        dir_path = Path(cert_dir)
+        if not dir_path.is_dir():
+            continue
+        for cert_file in dir_path.iterdir():
+            try:
+                pem = cert_file.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            if "BEGIN CERTIFICATE" not in pem:
+                continue
+            try:
+                ctx.load_verify_locations(cadata=pem)
+            except ssl.SSLError:
+                continue
+
+    _ssl_context = ctx
+    return ctx
+
 
 def new_client(timeout: float = 20.0) -> httpx.Client:
     return httpx.Client(
         headers={"User-Agent": USER_AGENT, "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8"},
         timeout=timeout,
         follow_redirects=True,
+        verify=_build_ssl_context(),
     )
 
 
