@@ -1,0 +1,54 @@
+[
+  {
+    "id": "dominio-publico",
+    "name": "Domínio Público (MEC)",
+    "url": "https://www.dominiopublico.gov.br",
+    "category": "livro",
+    "language": "Português",
+    "formats": ["pdf"],
+    "renderer": "browser",
+    "enabled": false,
+    "priority": 1,
+    "description": "Biblioteca digital do governo federal (MEC) — mais de 100 mil obras em domínio público, download em PDF sem custo",
+    "note": "Requisição HTTP simples retorna 403 mesmo com User-Agent de navegador — precisa do backend Chromium headless (core/fetch.py) quando o motor genérico existir"
+  },
+  {
+    "id": "wikisource-pt",
+    "name": "Wikisource (PT)",
+    "url": "https://pt.wikisource.org",
+    "category": "livro",
+    "language": "Português",
+    "formats": ["epub"],
+    "renderer": "http",
+    "enabled": false,
+    "priority": 2,
+    "description": "Textos de domínio público em português mantidos pela comunidade Wikimedia",
+    "note": "Tem API MediaWiki própria — candidato a provider dedicado (como o Gutenberg), não precisa esperar o motor genérico"
+  },
+  {
+    "id": "leia-livre",
+    "name": "Leia Livre",
+    "url": "https://leialivre.com",
+    "category": "livro",
+    "language": "Português",
+    "formats": ["pdf", "epub", "txt", "mobi"],
+    "renderer": "http",
+    "enabled": false,
+    "priority": 3,
+    "description": "Biblioteca digital gratuita de livros em domínio público",
+    "note": "Responde HTTP direto (200) — candidato ao motor genérico"
+  },
+  {
+    "id": "baixe-livros-quadrinhos",
+    "name": "Baixe Livros — Quadrinhos",
+    "url": "https://www.baixelivros.com.br/biblioteca/quadrinhos",
+    "category": "quadrinho",
+    "language": "Português",
+    "formats": ["pdf"],
+    "renderer": "http",
+    "enabled": false,
+    "priority": 5,
+    "description": "Mesma plataforma de livros da Baixe Livros, também cataloga gibis/HQs em PDF",
+    "note": "Responde HTTP direto (200) — candidato ao motor genérico"
+  }
+]

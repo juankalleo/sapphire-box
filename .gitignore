@@ -1,10 +1,12 @@
-## Node and build
-node_modules/
-dist/
-target/
-*.whl
+## Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
 *.egg-info/
 build/
+dist/
+*.db
 
 ## OS
 .DS_Store
@@ -24,11 +26,3 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
-
-## Tauri
-src-tauri/target/
-src-ui/dist/
-
-## Cache
-.cache/
-*.cache

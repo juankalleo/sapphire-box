@@ -1,0 +1,101 @@
+[
+  {
+    "id": "baixelivros",
+    "name": "Baixe Livros",
+    "url": "https://www.baixelivros.com.br",
+    "category": "livro",
+    "language": "Português",
+    "formats": ["pdf"],
+    "enabled": true,
+    "priority": 1,
+    "description": "Acervo PT-BR com páginas de detalhe e download direto em PDF quando a obra expõe o arquivo público"
+  },
+  {
+    "id": "bdebooks",
+    "name": "BDeBooks",
+    "url": "https://bdebooks.com/pt/",
+    "category": "livro",
+    "language": "Português",
+    "formats": ["pdf", "epub", "mobi"],
+    "enabled": true,
+    "priority": 2,
+    "description": "Catálogo PT com detalhes por obra e links diretos por formato quando disponíveis"
+  },
+  {
+    "id": "zonafantasma",
+    "name": "Zona Fantasma",
+    "url": "https://zonafantasmanet.com.br",
+    "category": "quadrinho",
+    "language": "Português",
+    "formats": ["cbr"],
+    "enabled": true,
+    "priority": 1,
+    "description": "Um post por edição; catálogo, busca e paginação são a mesma listagem do tema. Download real via Mediafire (link direto vem no próprio HTML)"
+  },
+  {
+    "id": "multiversohq",
+    "name": "Multiverso HQ",
+    "url": "https://multiversohq.com",
+    "category": "quadrinho",
+    "language": "Português",
+    "formats": ["cbr"],
+    "enabled": true,
+    "priority": 2,
+    "description": "Catálogo enorme (milhares de itens) organizado por editora/personagem; download fica atrás de um desafio anti-robô do Workupload que precisa ser resolvido manualmente"
+  },
+  {
+    "id": "libgen",
+    "name": "Library Genesis",
+    "url": "https://libgen.li",
+    "category": "livro",
+    "language": "Multilíngue",
+    "formats": ["epub", "pdf", "mobi", "djvu", "fb2"],
+    "enabled": true,
+    "priority": 3,
+    "description": "Um dos maiores acervos do mundo, multi-idioma (cada resultado mostra o idioma dele, já que a busca mistura línguas) — inclui um bom volume em português. Download direto sem espera nem captcha nesse mirror"
+  },
+  {
+    "id": "gutenberg",
+    "name": "Project Gutenberg",
+    "url": "https://www.gutenberg.org",
+    "category": "livro",
+    "language": "Multilíngue",
+    "formats": ["epub", "txt"],
+    "enabled": false,
+    "priority": 10,
+    "description": "Desativado por padrão — foco do catálogo é PT-BR. Continua implementado, dá pra reativar (enabled: true) quando quiser"
+  },
+  {
+    "id": "internet_archive",
+    "name": "Internet Archive",
+    "url": "https://archive.org",
+    "category": "livro",
+    "language": "Multilíngue",
+    "formats": ["epub", "pdf", "txt"],
+    "enabled": false,
+    "priority": 11,
+    "description": "Desativado por padrão — foco do catálogo é PT-BR. Continua implementado, dá pra reativar (enabled: true) quando quiser"
+  },
+  {
+    "id": "wikisource",
+    "name": "Wikisource",
+    "url": "https://wikisource.org",
+    "category": "livro",
+    "language": "Multilíngue",
+    "formats": ["epub"],
+    "enabled": false,
+    "priority": 20,
+    "description": "Planejado para a Fase 2 — textos de domínio público mantidos pela comunidade"
+  },
+  {
+    "id": "openlibrary_meta",
+    "name": "Open Library (metadados)",
+    "url": "https://openlibrary.org",
+    "category": "livro",
+    "language": "Multilíngue",
+    "formats": [],
+    "enabled": false,
+    "priority": 21,
+    "description": "Planejado para a Fase 2 — só metadados/capas, não hospeda arquivos"
+  }
+]

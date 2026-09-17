@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sapphire Box</title>
+<link rel="icon" type="image/png" href="assets/favicons/sapphire-box-favicon.png">
+<link rel="stylesheet" href="styles.css?v=20260911-manual">
+<script src="vendor/jszip.min.js"></script>
+<script src="vendor/epub.min.js"></script>
+<script src="vendor/pdf.min.js"></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <button class="brand" id="brand-home" title="Início">
+        <img class="brand-logo" src="assets/sapphire-box.png" alt="" aria-hidden="true">
+        <h1 class="brand-name">Sapphire Box</h1>
+      </button>
+      <div class="spacer"></div>
+      <button class="icon-btn" id="theme-toggle" title="Alternar tema">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="theme-icon"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+    </header>
+
+    <div class="shell-body">
+      <aside class="sidebar">
+        <nav class="nav">
+          <button class="nav-item active" data-view="library">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
+            Biblioteca
+          </button>
+          <button class="nav-item" data-view="discover">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+            Descobrir
+          </button>
+          <button class="nav-item" data-view="search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+            Buscar
+          </button>
+        </nav>
+
+        <nav class="nav nav-bottom">
+          <button class="nav-item" data-view="downloads">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+            Downloads
+          </button>
+          <button class="nav-item" data-view="settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            Configurações
+          </button>
+          <button class="nav-item" data-view="about">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+            Sobre
+          </button>
+        </nav>
+      </aside>
+
+      <div class="main">
+        <div class="content">
+          <h1 id="view-title">Biblioteca</h1>
+          <p class="view-sub" id="view-sub">O que já foi baixado nesta máquina.</p>
+
+          <button type="button" class="ghost-link" id="discover-back" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            Todas as fontes
+          </button>
+
+          <div class="discover-sources" id="discover-sources" data-panel hidden>
+            <div class="source-grid" id="source-grid"></div>
+          </div>
+
+          <div class="segmented" id="search-category-toggle" hidden>
+            <button type="button" data-search-category="manga">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
+              <span>Mangás</span>
+            </button>
+            <button type="button" data-search-category="livro">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+              <span>Livros</span>
+            </button>
+            <button type="button" data-search-category="quadrinho">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
+              <span>Quadrinhos</span>
+            </button>
+          </div>
+
+          <form class="searchbar" id="searchbar" hidden>
+            <input type="search" id="query" placeholder="Buscar título…" autocomplete="off">
+            <select id="source-select"></select>
+            <button type="submit">Buscar</button>
+          </form>
+
+          <div class="library-toolbar" id="library-toolbar" hidden>
+            <form class="searchbar" id="library-filterbar">
+              <input type="search" id="library-query" placeholder="Filtrar por título…" autocomplete="off">
+              <select id="library-kind">
+                <option value="">Todos os tipos</option>
+                <option value="manga">Mangás</option>
+                <option value="book">Livros</option>
+              </select>
+              <button type="submit">Filtrar</button>
+            </form>
+            <div class="segmented" id="library-view-toggle">
+              <button type="button" data-library-view="cards" title="Cards">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                <span>Cards</span>
+              </button>
+              <button type="button" data-library-view="shelf" title="Prateleira">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="5" height="12" rx="1"/><rect x="10" y="4" width="5" height="12" rx="1"/><rect x="17" y="4" width="4" height="12" rx="1"/><path d="M3 20h18"/></svg>
+                <span>Prateleira</span>
+              </button>
+              <button type="button" data-library-view="list" title="Lista">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                <span>Lista</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="setting-row" id="settings-panel" data-panel hidden>
+            <label>Tema</label>
+            <div class="segmented" id="theme-segmented">
+              <button type="button" data-theme-value="dark">Escuro</button>
+              <button type="button" data-theme-value="light">Claro</button>
+            </div>
+
+            <label style="margin-top:22px;">Pasta dos downloads</label>
+            <div class="path-row">
+              <input type="text" id="library-path-input" placeholder="/caminho/para/a/biblioteca">
+              <button type="button" id="library-path-save">Salvar</button>
+            </div>
+            <p class="setting-hint" id="library-path-hint"></p>
+
+            <label style="margin-top:22px;">Armazenamento</label>
+            <div class="stats-row">
+              <div class="stat-tile"><span class="stat-value" id="stat-files">—</span><span class="stat-label">arquivos baixados</span></div>
+              <div class="stat-tile"><span class="stat-value" id="stat-size">—</span><span class="stat-label">em disco</span></div>
+            </div>
+
+            <label style="margin-top:22px;">Limpeza</label>
+            <div class="danger-row">
+              <button type="button" class="danger-action" id="settings-clear-library">Limpar tudo</button>
+              <p class="setting-hint" id="settings-clear-hint"></p>
+            </div>
+          </div>
+
+          <div class="downloads-panel" id="downloads-panel" data-panel hidden>
+            <div class="state" id="downloads-empty">
+              <p class="title">Nada baixando no momento</p>
+              <p class="desc">Toque em "Baixar" num resultado de busca — a fila aparece aqui na hora.</p>
+            </div>
+            <div class="job-list" id="job-list"></div>
+          </div>
+
+          <div class="about-panel" id="about-panel" data-panel hidden>
+            <p><strong>Sapphire Box</strong> — biblioteca e scraper de mangás, manhwas, livros e quadrinhos, em Python.</p>
+            <p class="muted">Versão 1.0.0 · sucessor do FireScan (Rust/Tauri) · <a href="https://github.com/juankalleo/fire-scan" target="_blank" rel="noopener">código no GitHub</a></p>
+          </div>
+
+          <div class="state" id="state-empty" hidden>
+            <p class="title">Nada por aqui ainda</p>
+            <p class="desc"></p>
+          </div>
+          <div class="state" id="state-error" hidden>
+            <p class="title">Deu ruim</p>
+            <p class="desc"></p>
+          </div>
+          <div class="skeleton-grid" id="state-loading" hidden>
+            <div class="skeleton-card"><div class="skeleton-cover"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+            <div class="skeleton-card"><div class="skeleton-cover"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+            <div class="skeleton-card"><div class="skeleton-cover"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+            <div class="skeleton-card"><div class="skeleton-cover"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+          </div>
+
+          <div class="grid" id="grid"></div>
+          <div class="library-sections" id="library-sections" hidden></div>
+
+          <div class="pagination" id="pagination" hidden>
+            <button type="button" id="page-prev">← Anterior</button>
+            <span id="page-indicator"></span>
+            <button type="button" id="page-next">Próxima →</button>
+          </div>
+        </div>
+
+        <div class="detail-view" id="detail-view" hidden>
+          <div class="detail-header">
+            <button type="button" id="detail-back">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+              Voltar
+            </button>
+          </div>
+          <section class="detail-layout">
+            <div class="detail-cover">
+              <img id="detail-cover" alt="">
+            </div>
+            <div class="detail-main">
+              <p class="detail-source" id="detail-source"></p>
+              <h2 id="detail-title"></h2>
+              <p class="detail-author" id="detail-author"></p>
+              <div class="detail-meta" id="detail-meta"></div>
+              <div class="detail-actions">
+                <button type="button" class="primary-action" id="detail-download">Baixar</button>
+                <button type="button" class="secondary-action" id="detail-read" hidden>Ler</button>
+              </div>
+              <div class="detail-synopsis" id="detail-synopsis"></div>
+            </div>
+          </section>
+          <div class="state" id="detail-loading" hidden>
+            <p class="title">Carregando detalhes</p>
+            <p class="desc">Buscando ficha, formatos e tamanhos disponíveis.</p>
+          </div>
+          <div class="state" id="detail-error" hidden>
+            <p class="title">Detalhes indisponíveis</p>
+            <p class="desc"></p>
+          </div>
+        </div>
+
+        <div class="reader" id="reader-view" hidden>
+          <div class="reader-header">
+            <button type="button" id="reader-back">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+              Voltar
+            </button>
+            <h2 id="reader-title"></h2>
+          </div>
+          <div class="reader-toolbar">
+            <button type="button" class="reader-tool" id="reader-prev" title="Anterior">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <button type="button" class="reader-tool" id="reader-next" title="Próximo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+            <button type="button" class="reader-tool" id="reader-zoom-out" title="Diminuir zoom">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M8 11h6M21 21l-4.3-4.3"/></svg>
+            </button>
+            <span class="reader-zoom" id="reader-zoom-label">100%</span>
+            <button type="button" class="reader-tool" id="reader-zoom-in" title="Aumentar zoom">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M8 11h6M11 8v6M21 21l-4.3-4.3"/></svg>
+            </button>
+            <button type="button" class="reader-tool reader-tool-text" id="reader-zoom-reset">Ajustar</button>
+            <button type="button" class="reader-tool reader-tool-text" id="reader-theme-page">Papel</button>
+            <button type="button" class="reader-tool reader-tool-text" id="reader-text-mode" hidden>Texto</button>
+            <button type="button" class="reader-tool reader-tool-text reader-mode-tool" id="reader-mode-pages" hidden>Páginas</button>
+            <button type="button" class="reader-tool reader-tool-text reader-mode-tool" id="reader-mode-continuous" hidden>Contínua</button>
+          </div>
+          <div class="reader-body">
+            <aside class="reader-toc" id="reader-toc"></aside>
+            <div class="reader-viewer" id="reader-viewer">
+              <div class="reader-manga" id="reader-manga" hidden>
+                <button type="button" class="reader-nav prev" id="reader-page-prev" aria-label="Página anterior">‹</button>
+                <img id="reader-page-img" alt="">
+                <button type="button" class="reader-nav next" id="reader-page-next" aria-label="Próxima página">›</button>
+                <div class="reader-page-indicator" id="reader-page-indicator"></div>
+              </div>
+              <div class="reader-strip" id="reader-strip" hidden></div>
+              <div id="reader-pdf" hidden>
+                <canvas id="reader-pdf-canvas"></canvas>
+                <div class="reader-page-indicator" id="reader-pdf-indicator"></div>
+              </div>
+              <pre id="reader-text" hidden></pre>
+              <div id="reader-epub" hidden></div>
+              <div class="state" id="reader-empty" hidden>
+                <p class="title">Nada pra ler ainda</p>
+                <p class="desc"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <template id="card-template">
+    <article class="card">
+      <div class="cover">
+        <img loading="lazy">
+        <div class="domain-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        </div>
+        <button type="button" class="card-menu" title="Opções do download" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        </button>
+      </div>
+      <h3 class="card-title"></h3>
+      <span class="card-pill"></span>
+      <div class="card-actions">
+        <button type="button" class="card-open">Baixar</button>
+      </div>
+    </article>
+  </template>
+
+  <template id="list-row-template">
+    <div class="list-row">
+      <div class="list-row-thumb"><img loading="lazy"></div>
+      <div class="list-row-info">
+        <h3 class="list-row-title"></h3>
+        <span class="list-row-pill"></span>
+      </div>
+      <div class="list-row-actions">
+        <button type="button" class="list-row-open"></button>
+        <button type="button" class="list-row-menu" title="Opções" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        </button>
+      </div>
+    </div>
+  </template>
+
+  <template id="source-tile-template">
+    <button type="button" class="source-tile">
+      <span class="source-tile-icon">
+        <img alt="" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
+      </span>
+      <span class="source-tile-name"></span>
+      <span class="source-tile-meta"></span>
+    </button>
+  </template>
+
+  <template id="job-row-template">
+    <div class="job-row">
+      <div class="job-cover"><img loading="lazy"></div>
+      <div class="job-info">
+        <div class="job-title-row">
+          <span class="job-title"></span>
+          <span class="job-status"></span>
+        </div>
+        <div class="job-bar"><div class="job-bar-fill"></div></div>
+        <div class="job-meta"></div>
+      </div>
+      <div class="job-actions">
+        <button type="button" class="job-action job-read" title="Ler">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+        </button>
+        <button type="button" class="job-action job-manual" title="Abrir no navegador">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+        </button>
+        <button type="button" class="job-action job-import" title="Importar de Downloads">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        </button>
+        <button type="button" class="job-action job-cancel" title="Cancelar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+        </button>
+        <button type="button" class="job-action job-retry" title="Tentar de novo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        </button>
+        <button type="button" class="job-action job-delete" title="Remover da lista">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16z"/></svg>
+        </button>
+      </div>
+    </div>
+  </template>
+
+  <div class="modal-backdrop" id="format-modal" hidden>
+    <div class="format-dialog" role="dialog" aria-modal="true" aria-labelledby="format-title">
+      <div class="format-dialog-header">
+        <h2 id="format-title">Escolher formato</h2>
+        <button type="button" class="modal-close" id="format-close" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <p class="format-book" id="format-book"></p>
+      <div class="format-options" id="format-options"></div>
+      <p class="format-total" id="format-total"></p>
+      <div class="format-actions">
+        <button type="button" class="secondary-action" id="format-cancel">Cancelar</button>
+        <button type="button" class="primary-action" id="format-confirm">Baixar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="chapter-modal" hidden>
+    <div class="format-dialog chapter-dialog" role="dialog" aria-modal="true" aria-labelledby="chapter-title">
+      <div class="format-dialog-header">
+        <h2 id="chapter-title">Escolher capítulos</h2>
+        <button type="button" class="modal-close" id="chapter-close" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <p class="format-book" id="chapter-book"></p>
+      <div class="chapter-tools">
+        <button type="button" id="chapter-select-missing">Não baixados</button>
+        <button type="button" id="chapter-select-all">Todos</button>
+        <button type="button" id="chapter-clear">Limpar</button>
+      </div>
+      <div class="chapter-options" id="chapter-options"></div>
+      <p class="format-total" id="chapter-total"></p>
+      <div class="format-actions">
+        <button type="button" class="secondary-action" id="chapter-cancel">Cancelar</button>
+        <button type="button" class="primary-action" id="chapter-confirm">Baixar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="mobile-fab" id="mobile-fab">
+    <div class="fab-menu" id="fab-menu">
+      <button class="fab-item" data-view="about">
+        <span class="fab-label">Sobre</span>
+        <span class="fab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span>
+      </button>
+      <button class="fab-item" data-view="settings">
+        <span class="fab-label">Configurações</span>
+        <span class="fab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+      </button>
+      <button class="fab-item" data-view="downloads">
+        <span class="fab-label">Downloads</span>
+        <span class="fab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg></span>
+      </button>
+      <button class="fab-item" data-view="search">
+        <span class="fab-label">Buscar</span>
+        <span class="fab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg></span>
+      </button>
+      <button class="fab-item" data-view="discover">
+        <span class="fab-label">Descobrir</span>
+        <span class="fab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg></span>
+      </button>
+      <button class="fab-item" data-view="library">
+        <span class="fab-label">Biblioteca</span>
+        <span class="fab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg></span>
+      </button>
+    </div>
+    <button class="fab-main" id="fab-main" aria-label="Menu" aria-expanded="false">
+      <svg class="icon-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+      <svg class="icon-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+
+  <script src="app.js?v=20260911-manual"></script>
+</body>
+</html>

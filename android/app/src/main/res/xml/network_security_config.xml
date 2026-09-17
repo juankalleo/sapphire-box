@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  O APK standalone carrega a UI pelo servidor local interno em
+  127.0.0.1. Sem isso o WebView pode bloquear HTTP cleartext por padrão
+  a partir do Android 9.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
