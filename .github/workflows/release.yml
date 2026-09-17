@@ -46,7 +46,7 @@ jobs:
           - os: windows-latest
             artifact: SapphireBox-Windows-x64.exe
             built: dist/SapphireBox.exe
-          - os: macos-13
+          - os: macos-15-intel
             artifact: SapphireBox-macOS-x64
             built: dist/SapphireBox
           - os: ubuntu-latest
