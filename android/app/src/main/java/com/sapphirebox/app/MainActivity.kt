@@ -14,25 +14,33 @@ import android.provider.Settings
 import android.util.Base64
 import android.view.View
 import android.webkit.JavascriptInterface
+import android.webkit.JsPromptResult
+import android.webkit.JsResult
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.webkit.WebViewAssetLoader
 import com.chaquo.python.PyObject
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import java.io.ByteArrayInputStream
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import org.json.JSONObject
 
 class MainActivity : AppCompatActivity() {
@@ -53,6 +61,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var allFilesAccessLauncher: ActivityResultLauncher<Intent>
     private lateinit var legacyStoragePermissionLauncher: ActivityResultLauncher<String>
     private var pendingFolderPickAfterPermission = false
+
+    // In-app update flow: download the new APK, then hand it to the system
+    // installer — still needs a final human tap on "Instalar" (Android
+    // never lets a non-system app install silently), but skips the
+    // "open browser, find the file, remember to come back" detour.
+    private lateinit var installSourceLauncher: ActivityResultLauncher<Intent>
+    private var pendingUpdateUrl: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -80,6 +95,16 @@ class MainActivity : AppCompatActivity() {
             pendingFolderPickAfterPermission = false
             if (granted) openTreeLauncher.launch(null) else notifyFolderPickFailed()
         }
+        installSourceLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            val url = pendingUpdateUrl
+            pendingUpdateUrl = null
+            if (url == null) return@registerForActivityResult
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || packageManager.canRequestPackageInstalls()) {
+                startApkDownload(url)
+            } else {
+                notifyUpdateError("Permissão pra instalar não foi concedida.")
+            }
+        }
 
         webView = findViewById(R.id.webview)
         setupForm = findViewById(R.id.setup_form)
@@ -104,6 +129,24 @@ class MainActivity : AppCompatActivity() {
                 return assetLoader.shouldInterceptRequest(request.url)
             }
 
+            // A plain in-app link (e.g. the "baixar atualização" link to the
+            // GitHub releases page) would otherwise either get silently
+            // dropped or navigate the WebView itself away from the app's
+            // own UI — there's no multi-window/onCreateWindow handling set
+            // up for target="_blank" to open a real new tab. Anything that
+            // isn't our own bundled page goes to the system browser instead.
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                val uri = request.url
+                if (uri.host == "appassets.androidplatform.net") return false
+                if (uri.scheme != "http" && uri.scheme != "https") return false
+                return try {
+                    startActivity(Intent(Intent.ACTION_VIEW, uri))
+                    true
+                } catch (_: ActivityNotFoundException) {
+                    false
+                }
+            }
+
             override fun onReceivedError(
                 view: WebView,
                 request: WebResourceRequest,
@@ -118,6 +161,54 @@ class MainActivity : AppCompatActivity() {
                         isError = true
                     )
                 }
+            }
+        }
+        // The web UI leans on plain window.confirm()/alert()/prompt() for
+        // delete confirmations and error messages (same code runs in a
+        // desktop browser too). A WebView shows none of that without a
+        // WebChromeClient — it just auto-cancels the dialog and moves on,
+        // which is why e.g. the "esse quadrinho vem como arquivo único...
+        // continuar?" confirm() before a comic download silently returned
+        // false and the download never started.
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onJsAlert(view: WebView, url: String, message: String, result: JsResult): Boolean {
+                AlertDialog.Builder(this@MainActivity)
+                    .setMessage(message)
+                    .setPositiveButton(android.R.string.ok) { _, _ -> result.confirm() }
+                    .setOnCancelListener { result.confirm() }
+                    .setCancelable(false)
+                    .show()
+                return true
+            }
+
+            override fun onJsConfirm(view: WebView, url: String, message: String, result: JsResult): Boolean {
+                AlertDialog.Builder(this@MainActivity)
+                    .setMessage(message)
+                    .setPositiveButton(android.R.string.ok) { _, _ -> result.confirm() }
+                    .setNegativeButton(android.R.string.cancel) { _, _ -> result.cancel() }
+                    .setOnCancelListener { result.cancel() }
+                    .setCancelable(false)
+                    .show()
+                return true
+            }
+
+            override fun onJsPrompt(
+                view: WebView,
+                url: String,
+                message: String,
+                defaultValue: String?,
+                result: JsPromptResult
+            ): Boolean {
+                val input = EditText(this@MainActivity).apply { setText(defaultValue) }
+                AlertDialog.Builder(this@MainActivity)
+                    .setMessage(message)
+                    .setView(input)
+                    .setPositiveButton(android.R.string.ok) { _, _ -> result.confirm(input.text.toString()) }
+                    .setNegativeButton(android.R.string.cancel) { _, _ -> result.cancel() }
+                    .setOnCancelListener { result.cancel() }
+                    .setCancelable(false)
+                    .show()
+                return true
             }
         }
 
@@ -353,6 +444,96 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun beginUpdateDownload(url: String) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
+            pendingUpdateUrl = url
+            val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                data = Uri.parse("package:$packageName")
+            }
+            try {
+                installSourceLauncher.launch(intent)
+            } catch (_: ActivityNotFoundException) {
+                pendingUpdateUrl = null
+                notifyUpdateError("Não achei a tela de permissão de instalação desse Android.")
+            }
+            return
+        }
+        startApkDownload(url)
+    }
+
+    private fun startApkDownload(url: String) {
+        Thread {
+            var connection: HttpURLConnection? = null
+            try {
+                val apkFile = File(cacheDir, "update.apk")
+                connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                    instanceFollowRedirects = true
+                    connectTimeout = 20_000
+                    readTimeout = 20_000
+                    connect()
+                }
+                if (connection.responseCode !in 200..299) {
+                    notifyUpdateError("O servidor respondeu ${connection.responseCode} ao baixar o APK.")
+                    return@Thread
+                }
+                val total = connection.contentLengthLong
+                var downloaded = 0L
+                var lastReportedPct = -1
+                connection.inputStream.use { input ->
+                    apkFile.outputStream().use { output ->
+                        val buffer = ByteArray(64 * 1024)
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read <= 0) break
+                            output.write(buffer, 0, read)
+                            downloaded += read
+                            if (total > 0) {
+                                val pct = ((downloaded * 100) / total).toInt()
+                                if (pct != lastReportedPct) {
+                                    lastReportedPct = pct
+                                    notifyUpdateProgress(pct)
+                                }
+                            }
+                        }
+                    }
+                }
+                installApk(apkFile)
+            } catch (error: Exception) {
+                notifyUpdateError(error.message ?: error.javaClass.simpleName)
+            } finally {
+                connection?.disconnect()
+            }
+        }.start()
+    }
+
+    private fun installApk(file: File) {
+        val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        runOnUiThread {
+            try {
+                startActivity(intent)
+            } catch (_: ActivityNotFoundException) {
+                notifyUpdateError("Não achei um instalador de pacotes nesse Android.")
+            }
+        }
+    }
+
+    private fun notifyUpdateProgress(pct: Int) {
+        webView.post {
+            webView.evaluateJavascript("window.onSapphireBoxUpdateProgress && window.onSapphireBoxUpdateProgress($pct)", null)
+        }
+    }
+
+    private fun notifyUpdateError(message: String) {
+        val escaped = JSONObject.quote(message)
+        webView.post {
+            webView.evaluateJavascript("window.onSapphireBoxUpdateError && window.onSapphireBoxUpdateError($escaped)", null)
+        }
+    }
+
     private fun showStartup(message: String, isError: Boolean, allowRetry: Boolean = true) {
         webView.visibility = View.GONE
         serverStatus.text = message
@@ -380,6 +561,14 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun pickFolder() {
             runOnUiThread { beginFolderPick() }
+        }
+
+        @JavascriptInterface
+        fun hasAutoUpdate(): Boolean = true
+
+        @JavascriptInterface
+        fun downloadAndInstallUpdate(apkUrl: String) {
+            runOnUiThread { beginUpdateDownload(apkUrl) }
         }
     }
 }

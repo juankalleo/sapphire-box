@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Exposes the app's cache dir (where the downloaded update APK is saved)
+  through the FileProvider, so the system installer — a different app —
+  can be handed a content:// Uri to it instead of a raw file:// path,
+  which Android has forbidden sharing across apps since Nougat.
+-->
+<paths>
+    <cache-path name="updates" path="." />
+</paths>

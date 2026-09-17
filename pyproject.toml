@@ -34,6 +34,7 @@ include = ["sapphirebox*"]
     "web/*.html",
     "web/*.css",
     "web/*.js",
+    "web/*.json",
     "web/assets/*",
     "web/assets/favicons/*",
     "web/vendor/*",

@@ -19,6 +19,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Stamp build info
+        run: |
+          printf '{"commit": "%s", "builtAt": "%s"}\n' "${GITHUB_SHA}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > sapphirebox/assets/web/build-info.json
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -56,6 +60,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Stamp build info
+        shell: bash
+        run: |
+          printf '{"commit": "%s", "builtAt": "%s"}\n' "${GITHUB_SHA}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > sapphirebox/assets/web/build-info.json
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -91,6 +100,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Stamp build info
+        run: |
+          printf '{"commit": "%s", "builtAt": "%s"}\n' "${GITHUB_SHA}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > android/app/src/main/assets/web/build-info.json
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -104,24 +117,22 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Generate local release keystore
+      - name: Decode release keystore
         run: |
-          keytool -genkeypair \
-            -keystore "$RUNNER_TEMP/sapphirebox-release.keystore" \
-            -storepass sapphirebox \
-            -keypass sapphirebox \
-            -alias sapphirebox \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -dname "CN=Sapphire Box, OU=Release, O=Sapphire Box, L=Local, S=Local, C=BR"
+          if [ -z "${ANDROID_KEYSTORE_BASE64}" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 secret is not set — see android/README.md for how to generate and store the release keystore. Without it every build would be signed with a different throwaway key, and nobody could ever install an update over a previous one without uninstalling first."
+            exit 1
+          fi
+          echo "${ANDROID_KEYSTORE_BASE64}" | base64 -d > "$RUNNER_TEMP/sapphirebox-release.keystore"
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
 
       - name: Build Android release APK
         env:
           ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/sapphirebox-release.keystore
-          ANDROID_KEYSTORE_PASSWORD: sapphirebox
-          ANDROID_KEY_ALIAS: sapphirebox
-          ANDROID_KEY_PASSWORD: sapphirebox
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: gradle -p android :app:assembleRelease
 
       - name: Prepare APK

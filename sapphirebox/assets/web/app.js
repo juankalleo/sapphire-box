@@ -110,6 +110,15 @@ const el = {
   sourceGrid: document.getElementById("source-grid"),
   sourceTileTemplate: document.getElementById("source-tile-template"),
   themeToggle: document.getElementById("theme-toggle"),
+  updateCheckBtn: document.getElementById("update-check-btn"),
+  updateModal: document.getElementById("update-modal"),
+  updateClose: document.getElementById("update-close"),
+  updateCloseBtn: document.getElementById("update-close-btn"),
+  updateStatus: document.getElementById("update-status"),
+  updateDownloadLink: document.getElementById("update-download-link"),
+  updateInstallBtn: document.getElementById("update-install-btn"),
+  updateProgress: document.getElementById("update-progress"),
+  updateProgressBar: document.getElementById("update-progress-bar"),
   themeIcon: document.getElementById("theme-icon"),
   themeSegmented: document.getElementById("theme-segmented"),
   pagination: document.getElementById("pagination"),
@@ -141,6 +150,7 @@ const el = {
   detailRead: document.getElementById("detail-read"),
   detailSynopsis: document.getElementById("detail-synopsis"),
   readerBack: document.getElementById("reader-back"),
+  readerFullscreen: document.getElementById("reader-fullscreen"),
   readerTitle: document.getElementById("reader-title"),
   readerToc: document.getElementById("reader-toc"),
   readerViewer: document.getElementById("reader-viewer"),
@@ -155,6 +165,9 @@ const el = {
   readerPdf: document.getElementById("reader-pdf"),
   readerPdfCanvas: document.getElementById("reader-pdf-canvas"),
   readerPdfIndicator: document.getElementById("reader-pdf-indicator"),
+  readerPdfPrev: document.getElementById("reader-pdf-prev"),
+  readerPdfNext: document.getElementById("reader-pdf-next"),
+  readerPdfStrip: document.getElementById("reader-pdf-strip"),
   readerText: document.getElementById("reader-text"),
   readerEpub: document.getElementById("reader-epub"),
   readerEmpty: document.getElementById("reader-empty"),
@@ -202,6 +215,7 @@ let pdfDoc = null;
 let pdfPageNum = 1;
 let pdfNumPages = 0;
 let pdfRenderTask = null;
+let pdfContinuousObserver = null;
 let currentReaderItem = null;
 let currentPdfText = "";
 let readerZoom = 100;
@@ -253,6 +267,106 @@ function setTheme(theme) {
 
 applyTheme(getTheme());
 
+// ---- update check ----
+// build-info.json is a plain static file (not an /api/ route), regenerated
+// fresh at build time by release.yml with this specific build's own commit
+// + build timestamp — desktop/Android/web dev builds all keep their own
+// copy in assets/web/. There's no meaningfully incrementing version number
+// in this project's release flow (the same v1.0.0 tag's assets just get
+// replaced on every rebuild), so "is there an update" is answered by
+// comparing this build's timestamp against the Android APK release
+// asset's own last-replaced time — the actual file someone would
+// download, not just "did main move" (a release isn't necessarily
+// rebuilt after every commit).
+const ANDROID_APK_ASSET_RE = /\.apk$/i;
+let pendingUpdateApkUrl = null;
+const hasAndroidAutoUpdate = () =>
+  Boolean(window.SapphireBoxAndroid && typeof window.SapphireBoxAndroid.hasAutoUpdate === "function" && window.SapphireBoxAndroid.hasAutoUpdate());
+
+async function checkForUpdates() {
+  el.updateDownloadLink.hidden = true;
+  el.updateInstallBtn.hidden = true;
+  el.updateInstallBtn.disabled = false;
+  el.updateInstallBtn.textContent = "Atualizar agora";
+  el.updateProgress.hidden = true;
+  el.updateProgressBar.style.width = "0%";
+  el.updateStatus.textContent = "Verificando…";
+  pendingUpdateApkUrl = null;
+  try {
+    const infoRes = await fetch("build-info.json", { cache: "no-store" });
+    const info = infoRes.ok ? await infoRes.json() : {};
+    const builtAt = info.builtAt ? new Date(info.builtAt) : null;
+
+    const ghRes = await fetch("https://api.github.com/repos/juankalleo/sapphire-box/releases/latest", { cache: "no-store" });
+    if (!ghRes.ok) throw new Error(`GitHub respondeu ${ghRes.status}`);
+    const release = await ghRes.json();
+    const apkAsset = (release.assets || []).find((a) => ANDROID_APK_ASSET_RE.test(a.name));
+
+    if (!builtAt || Number.isNaN(builtAt.getTime())) {
+      el.updateStatus.textContent = "Essa build não tem data gravada pra comparar (build de desenvolvimento). Use o link abaixo pra ver a versão mais recente.";
+      el.updateDownloadLink.hidden = false;
+      return;
+    }
+    if (!apkAsset) {
+      el.updateStatus.textContent = "Não achei o APK na última release do GitHub.";
+      el.updateDownloadLink.hidden = false;
+      return;
+    }
+
+    const releaseUpdatedAt = new Date(apkAsset.updated_at);
+    if (releaseUpdatedAt.getTime() <= builtAt.getTime()) {
+      el.updateStatus.textContent = "Você já está na versão mais recente.";
+      return;
+    }
+
+    el.updateStatus.textContent = `Tem atualização disponível (publicada em ${releaseUpdatedAt.toLocaleString("pt-BR")}).`;
+    if (hasAndroidAutoUpdate()) {
+      pendingUpdateApkUrl = apkAsset.browser_download_url;
+      el.updateInstallBtn.hidden = false;
+    } else {
+      el.updateDownloadLink.hidden = false;
+    }
+  } catch (err) {
+    el.updateStatus.textContent = `Não deu pra checar agora — confira sua internet e tenta de novo. (${err.message})`;
+  }
+}
+
+function openUpdateModal() {
+  el.updateModal.hidden = false;
+  checkForUpdates();
+}
+
+function closeUpdateModal() {
+  el.updateModal.hidden = true;
+}
+
+el.updateCheckBtn.addEventListener("click", openUpdateModal);
+el.updateClose.addEventListener("click", closeUpdateModal);
+el.updateCloseBtn.addEventListener("click", closeUpdateModal);
+
+el.updateInstallBtn.addEventListener("click", () => {
+  if (!pendingUpdateApkUrl || !window.SapphireBoxAndroid) return;
+  el.updateInstallBtn.disabled = true;
+  el.updateInstallBtn.textContent = "Baixando…";
+  el.updateProgress.hidden = false;
+  el.updateProgressBar.style.width = "0%";
+  el.updateStatus.textContent = "Baixando atualização…";
+  window.SapphireBoxAndroid.downloadAndInstallUpdate(pendingUpdateApkUrl);
+});
+
+// Called by MainActivity.kt while the update APK downloads, and if the
+// download or the handoff to the system installer fails.
+window.onSapphireBoxUpdateProgress = (pct) => {
+  el.updateProgressBar.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+  el.updateStatus.textContent = pct >= 100 ? "Abrindo o instalador…" : `Baixando atualização… ${pct}%`;
+};
+
+window.onSapphireBoxUpdateError = (message) => {
+  el.updateInstallBtn.disabled = false;
+  el.updateInstallBtn.textContent = "Tentar de novo";
+  el.updateStatus.textContent = `Não deu pra atualizar: ${message}`;
+};
+
 el.themeToggle.addEventListener("click", () => {
   setTheme(getTheme() === "dark" ? "light" : "dark");
 });
@@ -270,6 +384,16 @@ function isAndroidApiRequest(url) {
   } catch (err) {
     return false;
   }
+}
+
+// A cover is either a remote http(s) URL (search/discover, straight from
+// the source's site) or a local disk path (once the item's been
+// downloaded) — the latter needs proxying through /api/cover since a bare
+// filesystem path isn't something an <img> can fetch on its own.
+function resolveCoverSrc(coverPath) {
+  if (!coverPath) return null;
+  if (/^https?:\/\//.test(coverPath)) return coverPath;
+  return `/api/cover?path=${encodeURIComponent(coverPath)}`;
 }
 
 function bytesFromBase64(value) {
@@ -413,9 +537,9 @@ function renderCards(items, mode, container = el.grid) {
     pill.textContent = cardPillText(item);
     badgeIcon.innerHTML = domain === "manga" ? ICON_MANGA : ICON_BOOKS;
 
-    const cover = item.coverPath;
-    if (cover && /^https?:\/\//.test(cover)) {
-      img.src = cover;
+    const coverSrc = resolveCoverSrc(item.coverPath);
+    if (coverSrc) {
+      img.src = coverSrc;
       img.alt = title.textContent;
       img.onerror = () => { img.remove(); };
     } else {
@@ -592,9 +716,10 @@ function renderDetails(item) {
   }).join(" / ");
 
   const coverBox = el.detailCover.closest(".detail-cover");
-  if (item.coverPath && /^https?:\/\//.test(item.coverPath)) {
+  const detailCoverSrc = resolveCoverSrc(item.coverPath);
+  if (detailCoverSrc) {
     coverBox.hidden = false;
-    el.detailCover.src = item.coverPath;
+    el.detailCover.src = detailCoverSrc;
     el.detailCover.alt = item.title || "";
     el.detailCover.onerror = () => { coverBox.hidden = true; };
   } else {
@@ -951,8 +1076,9 @@ function renderJobs(jobs) {
     bar.style.width = `${job.status === "completed" ? 100 : job.progress || 0}%`;
     meta.textContent = job.status === "error" ? job.error : (job.lastStdout || "");
 
-    if (job.coverPath && /^https?:\/\//.test(job.coverPath)) {
-      img.src = job.coverPath;
+    const jobCoverSrc = resolveCoverSrc(job.coverPath);
+    if (jobCoverSrc) {
+      img.src = jobCoverSrc;
       img.onerror = () => { img.remove(); };
     } else {
       img.remove();
@@ -1099,9 +1225,9 @@ function renderListRow(item, container) {
   title.textContent = item.title || "Sem título";
   pill.textContent = cardPillText(item);
 
-  const cover = item.coverPath;
-  if (cover && /^https?:\/\//.test(cover)) {
-    img.src = cover;
+  const listCoverSrc = resolveCoverSrc(item.coverPath);
+  if (listCoverSrc) {
+    img.src = listCoverSrc;
     img.alt = title.textContent;
     img.onerror = () => { img.remove(); };
   } else {
@@ -1390,6 +1516,12 @@ function resetReaderPanels() {
   el.readerStrip.hidden = true;
   el.readerStrip.innerHTML = "";
   el.readerPdf.hidden = true;
+  el.readerPdfStrip.hidden = true;
+  el.readerPdfStrip.innerHTML = "";
+  if (pdfContinuousObserver) {
+    pdfContinuousObserver.disconnect();
+    pdfContinuousObserver = null;
+  }
   if (pdfRenderTask) {
     pdfRenderTask.cancel();
     pdfRenderTask = null;
@@ -1446,6 +1578,10 @@ function openReader(item) {
 }
 
 function closeReader() {
+  if (isFullscreenActive()) {
+    const exit = document.exitFullscreen || document.webkitExitFullscreen;
+    if (exit) exit.call(document).catch(() => {});
+  }
   resetReaderPanels();
   el.readerView.hidden = true;
   el.main.classList.remove("reader-open");
@@ -1474,8 +1610,9 @@ function readerGoPrev() {
   if (mangaReaderState) {
     if (readerLayoutMode === "continuous") scrollToContinuousPage(mangaReaderState.index - 1);
     else showMangaPage(mangaReaderState.index - 1);
-  } else if (pdfDoc && !el.readerPdf.hidden) {
-    goToPdfPage(pdfPageNum - 1);
+  } else if (pdfDoc) {
+    if (readerLayoutMode === "continuous") scrollToPdfStripPage(pdfPageNum - 1);
+    else goToPdfPage(pdfPageNum - 1);
   } else if (epubRendition) {
     epubRendition.prev();
   } else {
@@ -1487,8 +1624,9 @@ function readerGoNext() {
   if (mangaReaderState) {
     if (readerLayoutMode === "continuous") scrollToContinuousPage(mangaReaderState.index + 1);
     else showMangaPage(mangaReaderState.index + 1);
-  } else if (pdfDoc && !el.readerPdf.hidden) {
-    goToPdfPage(pdfPageNum + 1);
+  } else if (pdfDoc) {
+    if (readerLayoutMode === "continuous") scrollToPdfStripPage(pdfPageNum + 1);
+    else goToPdfPage(pdfPageNum + 1);
   } else if (epubRendition) {
     epubRendition.next();
   } else {
@@ -1498,6 +1636,39 @@ function readerGoNext() {
 
 el.readerPrev.addEventListener("click", readerGoPrev);
 el.readerNext.addEventListener("click", readerGoNext);
+el.readerPdfPrev.addEventListener("click", readerGoPrev);
+el.readerPdfNext.addEventListener("click", readerGoNext);
+
+function isFullscreenActive() {
+  return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+}
+
+function updateFullscreenIcon() {
+  const active = isFullscreenActive();
+  el.readerFullscreen.title = active ? "Sair da tela cheia" : "Tela cheia";
+  el.readerFullscreen.innerHTML = active
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v3a2 2 0 0 1-2 2H4M15 3v3a2 2 0 0 0 2 2h3M9 21v-3a2 2 0 0 0-2-2H4M15 21v-3a2 2 0 0 1 2-2h3"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/></svg>';
+}
+
+async function toggleFullscreen() {
+  try {
+    if (!isFullscreenActive()) {
+      const target = el.readerView;
+      const request = target.requestFullscreen || target.webkitRequestFullscreen;
+      if (request) await request.call(target);
+    } else {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen;
+      if (exit) await exit.call(document);
+    }
+  } catch (err) {
+    console.error("fullscreen toggle failed", err);
+  }
+}
+
+el.readerFullscreen.addEventListener("click", toggleFullscreen);
+document.addEventListener("fullscreenchange", updateFullscreenIcon);
+document.addEventListener("webkitfullscreenchange", updateFullscreenIcon);
 
 function applyEpubReaderTheme() {
   if (!epubRendition) return;
@@ -1526,6 +1697,9 @@ function applyReaderZoom() {
   applyEpubReaderTheme();
   if (!el.readerPdf.hidden && pdfDoc) {
     renderPdfPage(pdfPageNum);
+  }
+  if (!el.readerPdfStrip.hidden && pdfDoc) {
+    reRenderPdfStripAtCurrentZoom();
   }
 }
 
@@ -1634,7 +1808,12 @@ function setReaderLayoutMode(mode) {
   readerLayoutMode = mode === "continuous" ? "continuous" : "pages";
   localStorage.setItem(READER_LAYOUT_KEY, readerLayoutMode);
   updateReaderModeButtons();
-  if (mangaReaderState) renderImageReader(mangaReaderState.index || 0);
+  if (mangaReaderState) {
+    renderImageReader(mangaReaderState.index || 0);
+  } else if (pdfDoc && el.readerText.hidden) {
+    if (readerLayoutMode === "continuous") renderContinuousPdfReader(pdfPageNum);
+    else renderPagedPdfReader(pdfPageNum);
+  }
 }
 
 function scrollToContinuousPage(index, behavior = "smooth") {
@@ -1789,14 +1968,19 @@ async function togglePdfTextMode() {
   if (!currentReaderItem || !currentBookFileUrl) return;
   if (!el.readerText.hidden) {
     el.readerText.hidden = true;
-    el.readerPdf.hidden = false;
     el.readerTextMode.textContent = "Texto";
-    if (pdfDoc) renderPdfPage(pdfPageNum);
-    else setReaderNavEnabled(false, false);
+    if (pdfDoc) {
+      if (readerLayoutMode === "continuous") renderContinuousPdfReader(pdfPageNum);
+      else renderPagedPdfReader(pdfPageNum);
+    } else {
+      setReaderNavEnabled(false, false);
+    }
     return;
   }
   if (currentPdfText) {
     el.readerPdf.hidden = true;
+    el.readerPdfStrip.hidden = true;
+    teardownPdfContinuous();
     el.readerText.hidden = false;
     el.readerText.textContent = currentPdfText;
     el.readerTextMode.textContent = "PDF";
@@ -1810,6 +1994,8 @@ async function togglePdfTextMode() {
     const data = await fetchJSON(`/api/library/books/text?id=${encodeURIComponent(currentReaderItem.id)}`);
     currentPdfText = data.text || "";
     el.readerPdf.hidden = true;
+    el.readerPdfStrip.hidden = true;
+    teardownPdfContinuous();
     el.readerText.hidden = false;
     el.readerText.textContent = currentPdfText;
     el.readerViewer.scrollTop = 0;
@@ -1901,10 +2087,123 @@ function goToPdfPage(num) {
   renderPdfPage(pdfPageNum);
 }
 
-async function openPdfReader(item, fileUrl) {
+function teardownPdfContinuous() {
+  if (pdfContinuousObserver) {
+    pdfContinuousObserver.disconnect();
+    pdfContinuousObserver = null;
+  }
+}
+
+function renderPagedPdfReader(num) {
+  el.readerView.classList.remove("reader-continuous-mode");
+  teardownPdfContinuous();
+  el.readerPdfStrip.hidden = true;
+  el.readerPdfStrip.innerHTML = "";
   el.readerPdf.hidden = false;
+  renderPdfPage(num);
+}
+
+// Continuous PDF reading: one canvas per page stacked in a scrollable
+// strip (same idea as the manga strip), rendered lazily as each page
+// scrolls into view instead of all at once up front — a 300-page PDF
+// rendered eagerly at full res would stall the page and burn memory.
+function renderPdfStripPage(pageNum) {
+  if (!pdfDoc) return;
+  const wrap = el.readerPdfStrip.querySelector(`.pdf-strip-page[data-page-index="${pageNum}"]`);
+  if (!wrap || wrap.dataset.rendered === "1") return;
+  wrap.dataset.rendered = "1";
+  pdfDoc.getPage(pageNum).then((page) => {
+    const canvas = wrap.querySelector("canvas");
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const scale = (readerZoom / 100) * dpr;
+    const viewport = page.getViewport({ scale });
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    canvas.style.width = `${viewport.width / dpr}px`;
+    canvas.style.height = `${viewport.height / dpr}px`;
+    page.render({ canvasContext: ctx, viewport });
+  });
+}
+
+function reRenderPdfStripAtCurrentZoom() {
+  el.readerPdfStrip.querySelectorAll('.pdf-strip-page[data-rendered="1"]').forEach((wrap) => {
+    wrap.dataset.rendered = "";
+    renderPdfStripPage(Number(wrap.dataset.pageIndex));
+  });
+}
+
+function scrollToPdfStripPage(num, behavior = "smooth") {
+  if (!pdfDoc) return;
+  const clamped = Math.max(1, Math.min(num, pdfNumPages));
+  const wrap = el.readerPdfStrip.querySelector(`.pdf-strip-page[data-page-index="${clamped}"]`);
+  if (wrap) {
+    const top = Math.max(0, wrap.offsetTop - el.readerPdfStrip.offsetTop);
+    el.readerViewer.scrollTo({ top, behavior });
+  }
+  pdfPageNum = clamped;
+  setReaderNavEnabled(clamped > 1, clamped < pdfNumPages);
+  if (currentReaderItem) {
+    saveReadingState(currentReaderItem.id, "pdf", { pageIndex: clamped - 1 });
+  }
+}
+
+function renderContinuousPdfReader(startPage) {
+  if (!pdfDoc) return;
+  el.readerView.classList.add("reader-continuous-mode");
+  el.readerPdf.hidden = true;
+  el.readerPdfStrip.hidden = false;
+  el.readerPdfStrip.innerHTML = "";
+  teardownPdfContinuous();
+
+  for (let i = 1; i <= pdfNumPages; i += 1) {
+    const wrap = document.createElement("div");
+    wrap.className = "pdf-strip-page";
+    wrap.dataset.pageIndex = String(i);
+    wrap.appendChild(document.createElement("canvas"));
+    el.readerPdfStrip.appendChild(wrap);
+  }
+
+  pdfContinuousObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) renderPdfStripPage(Number(entry.target.dataset.pageIndex));
+      });
+    },
+    { root: el.readerViewer, rootMargin: "800px 0px" }
+  );
+  el.readerPdfStrip.querySelectorAll(".pdf-strip-page").forEach((wrap) => pdfContinuousObserver.observe(wrap));
+
+  pdfPageNum = startPage;
+  setReaderNavEnabled(startPage > 1, startPage < pdfNumPages);
+  requestAnimationFrame(() => scrollToPdfStripPage(startPage, "auto"));
+}
+
+function updatePdfContinuousPosition() {
+  if (!pdfDoc || readerLayoutMode !== "continuous" || el.readerPdfStrip.hidden) return;
+  const wraps = [...el.readerPdfStrip.querySelectorAll(".pdf-strip-page")];
+  if (wraps.length === 0) return;
+  const center = el.readerViewer.scrollTop + el.readerViewer.clientHeight / 2;
+  let bestNum = pdfPageNum;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const wrap of wraps) {
+    const pageCenter = wrap.offsetTop - el.readerPdfStrip.offsetTop + wrap.clientHeight / 2;
+    const distance = Math.abs(pageCenter - center);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestNum = Number(wrap.dataset.pageIndex);
+    }
+  }
+  pdfPageNum = bestNum;
+  setReaderNavEnabled(bestNum > 1, bestNum < pdfNumPages);
+}
+
+el.readerViewer.addEventListener("scroll", updatePdfContinuousPosition);
+
+async function openPdfReader(item, fileUrl) {
   el.readerTextMode.hidden = false;
   el.readerTextMode.onclick = togglePdfTextMode;
+  setImageReaderControlsVisible(true);
   try {
     pdfDoc = await window.pdfjsLib.getDocument(fileUrl).promise;
     pdfNumPages = pdfDoc.numPages;
@@ -1914,7 +2213,8 @@ async function openPdfReader(item, fileUrl) {
       startPage = Math.max(1, Math.min(saved.pageIndex + 1, pdfNumPages));
     }
     pdfPageNum = startPage;
-    renderPdfPage(startPage);
+    if (readerLayoutMode === "continuous") renderContinuousPdfReader(startPage);
+    else renderPagedPdfReader(startPage);
   } catch (err) {
     el.readerEmpty.hidden = false;
     el.readerEmpty.querySelector(".desc").textContent = `Não deu pra abrir esse PDF: ${err.message}`;

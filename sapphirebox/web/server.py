@@ -529,6 +529,24 @@ def book_archive_page(id: str = Query(...), page: str = Query(...)) -> Response:
     return Response(content=data, media_type=media_type)
 
 
+@app.get("/api/cover")
+def cover_file(path: str = Query(...)) -> Response:
+    """Serves a cover saved to disk during a download — the frontend only
+    ever gets a remote http(s) cover URL (during search/discover, straight
+    from the source's own site) or a local one (once a manga/book with a
+    cover on disk is in the library); this is what makes the local kind
+    loadable as an <img src>, since a bare filesystem path isn't a URL a
+    WebView/browser can fetch on its own."""
+    candidate = Path(path).resolve()
+    allowed_roots = (config.get_library_path().resolve(), config.get_books_library_path().resolve())
+    if not any(candidate == root or root in candidate.parents for root in allowed_roots):
+        raise HTTPException(status_code=403, detail="Caminho de capa não permitido")
+    if not candidate.is_file():
+        raise HTTPException(status_code=404, detail="Capa não encontrada")
+    media_type = mimetypes.guess_type(candidate.name)[0] or "application/octet-stream"
+    return Response(content=candidate.read_bytes(), media_type=media_type)
+
+
 # --- reading position (retoma de onde parou) --------------------------------
 
 @app.get("/api/reading-state")

@@ -40,6 +40,35 @@ Para build local fora do Android Studio, deixe JDK 17, Android SDK e Python 3.11
 
 O workflow `.github/workflows/release.yml` gera o APK de release automaticamente.
 
+## Assinatura da Release (keystore persistente)
+
+`release.yml` assina o APK com uma keystore guardada nos secrets do repositório, não gerada na hora — se ela mudasse a cada build, o Android trataria cada APK novo como um app diferente e recusaria instalar por cima do anterior sem antes desinstalar (perdendo a biblioteca baixada de quem já tinha o app).
+
+Secrets necessários em Settings → Secrets and variables → Actions:
+
+- `ANDROID_KEYSTORE_BASE64` — a keystore (`.keystore`/`.jks`) inteira, codificada em base64 (`base64 -i minha.keystore | pbcopy` no mac, cole o resultado como o valor do secret).
+- `ANDROID_KEYSTORE_PASSWORD`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
+
+Sem esses 4 secrets configurados, o job `android-apk` falha de propósito (em vez de gerar uma keystore descartável silenciosamente).
+
+**Gerando uma keystore nova** (só se ainda não existir uma, ou se a atual foi perdida — trocar a keystore depois de já ter builds publicadas exige que todo mundo desinstale o app antigo uma vez):
+
+```bash
+keytool -genkeypair \
+  -keystore sapphirebox-release.keystore \
+  -storepass "UMA_SENHA_FORTE" \
+  -keypass "UMA_SENHA_FORTE" \
+  -alias sapphirebox \
+  -keyalg RSA -keysize 2048 -validity 10000 \
+  -dname "CN=Sapphire Box, OU=Release, O=Sapphire Box, L=Local, S=Local, C=BR"
+```
+
+Keystores modernas (PKCS12, o padrão do `keytool` atual) só suportam uma senha só pra tudo — `storepass` e `keypass` têm que ser iguais, ou o `keytool` ignora a diferença silenciosamente.
+
+Guarde o arquivo `.keystore` gerado em um lugar seguro fora do repositório (gerenciador de senhas, backup privado) — **nunca commitar no git**. Perder essa keystore tem o mesmo efeito de trocá-la: ninguém consegue mais atualizar por cima do app já instalado.
+
 ## Detalhes Técnicos
 
 - `com.chaquo.python` empacota o runtime Python e as dependências.
