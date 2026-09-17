@@ -7,29 +7,29 @@
 <h3 align="center">Biblioteca, scraper e leitor local para mangás, manhwas, livros e quadrinhos.</h3>
 
 <p align="center">
-  <a href="https://github.com/juankalleo/fire-scan/releases/latest">
-    <img alt="Latest release" src="https://img.shields.io/github/v/release/juankalleo/fire-scan?style=flat-square">
+  <a href="https://github.com/juankalleo/sapphire-box/releases/latest">
+    <img alt="Latest release" src="https://img.shields.io/github/v/release/juankalleo/sapphire-box?style=flat-square">
   </a>
-  <a href="https://github.com/juankalleo/fire-scan/releases/latest">
-    <img alt="Downloads" src="https://img.shields.io/github/downloads/juankalleo/fire-scan/total?style=flat-square">
+  <a href="https://github.com/juankalleo/sapphire-box/releases/latest">
+    <img alt="Downloads" src="https://img.shields.io/github/downloads/juankalleo/sapphire-box/total?style=flat-square">
   </a>
   <a href=".github/workflows/ci.yml">
-    <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/juankalleo/fire-scan/ci.yml?branch=main&style=flat-square">
+    <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/juankalleo/sapphire-box/ci.yml?branch=main&style=flat-square">
   </a>
   <img alt="Python" src="https://img.shields.io/badge/Python-3.10+-2F6FFF?style=flat-square&logo=python&logoColor=white">
 </p>
 
 <p align="center">
-  <a href="https://github.com/juankalleo/fire-scan/releases/latest/download/SapphireBox-Android-1.0.0.apk">
+  <a href="https://github.com/juankalleo/sapphire-box/releases/latest">
     <img alt="Download Android APK" src="https://img.shields.io/badge/Android-APK%201.0.0-2F6FFF?style=for-the-badge&logo=android&logoColor=white">
   </a>
-  <a href="https://github.com/juankalleo/fire-scan/releases/latest/download/SapphireBox-Windows-x64.exe">
+  <a href="https://github.com/juankalleo/sapphire-box/releases/latest">
     <img alt="Download Windows EXE" src="https://img.shields.io/badge/Windows-EXE-111827?style=for-the-badge&logo=windows&logoColor=white">
   </a>
-  <a href="https://github.com/juankalleo/fire-scan/releases/latest/download/SapphireBox-macOS-x64">
+  <a href="https://github.com/juankalleo/sapphire-box/releases/latest">
     <img alt="Download macOS binary" src="https://img.shields.io/badge/macOS-x64-111827?style=for-the-badge&logo=apple&logoColor=white">
   </a>
-  <a href="https://github.com/juankalleo/fire-scan/releases/latest/download/SapphireBox-Linux-x64">
+  <a href="https://github.com/juankalleo/sapphire-box/releases/latest">
     <img alt="Download Linux binary" src="https://img.shields.io/badge/Linux-binary-111827?style=for-the-badge&logo=linux&logoColor=white">
   </a>
 </p>
@@ -48,23 +48,23 @@ Sapphire Box busca, baixa, organiza e lê conteúdo localmente. O núcleo é Pyt
 - Desktop: macOS, Windows e Linux pelo mesmo código.
 - Android 1.0: APK standalone com Python embutido, UI local e downloads no próprio aparelho.
 
-## Direct Download
+## Downloads
 
 | Platform | Download | Notes |
 | --- | --- | --- |
-| Android | [APK 1.0.0](https://github.com/juankalleo/fire-scan/releases/latest/download/SapphireBox-Android-1.0.0.apk) | App standalone: não precisa de site publicado nem servidor no PC. |
-| Windows | [EXE x64](https://github.com/juankalleo/fire-scan/releases/latest/download/SapphireBox-Windows-x64.exe) | Binário portátil gerado por PyInstaller. |
-| macOS | [Binary x64](https://github.com/juankalleo/fire-scan/releases/latest/download/SapphireBox-macOS-x64) | Pode exigir liberar em Privacidade e Segurança na primeira abertura. |
-| Linux | [Binary x64](https://github.com/juankalleo/fire-scan/releases/latest/download/SapphireBox-Linux-x64) | Marque como executável antes de abrir. |
-| Python | [Wheel / source](https://github.com/juankalleo/fire-scan/releases/latest) | Melhor opção para desenvolvimento e automação CLI. |
+| Android | [APK 1.0.0](https://github.com/juankalleo/sapphire-box/releases/latest) | Baixe `SapphireBox-Android-1.0.0.apk`. App standalone: não precisa de site publicado nem servidor no PC. |
+| Windows | [EXE x64](https://github.com/juankalleo/sapphire-box/releases/latest) | Baixe `SapphireBox-Windows-x64.exe`. Binário portátil gerado por PyInstaller. |
+| macOS | [Binary x64](https://github.com/juankalleo/sapphire-box/releases/latest) | Baixe `SapphireBox-macOS-x64`. Pode exigir liberar em Privacidade e Segurança na primeira abertura. |
+| Linux | [Binary x64](https://github.com/juankalleo/sapphire-box/releases/latest) | Baixe `SapphireBox-Linux-x64` e marque como executável antes de abrir. |
+| Python | [Wheel / source](https://github.com/juankalleo/sapphire-box/releases/latest) | Baixe `sapphirebox-1.0.0-py3-none-any.whl` ou o source package. |
 
 ## Install From Source
 
 macOS/Linux:
 
 ```bash
-git clone https://github.com/juankalleo/fire-scan.git
-cd fire-scan
+git clone https://github.com/juankalleo/sapphire-box.git
+cd sapphire-box
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
@@ -73,8 +73,8 @@ pip install -e .
 Windows PowerShell:
 
 ```powershell
-git clone https://github.com/juankalleo/fire-scan.git
-cd fire-scan
+git clone https://github.com/juankalleo/sapphire-box.git
+cd sapphire-box
 py -3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -e .
@@ -132,6 +132,8 @@ git push origin v1.0.0
 ```
 
 Também dá para rodar manualmente em **Actions > Release > Run workflow**.
+
+Se os botões abrirem a release mas não aparecerem APK/EXE/binários, rode o workflow **Release** em Actions. A release só ganha esses arquivos depois que a Action termina e anexa os assets.
 
 ## Screenshots
 

@@ -154,4 +154,6 @@ jobs:
           name: Sapphire Box ${{ env.APP_VERSION }}
           draft: false
           prerelease: false
+          overwrite_files: true
+          fail_on_unmatched_files: true
           files: release/*
