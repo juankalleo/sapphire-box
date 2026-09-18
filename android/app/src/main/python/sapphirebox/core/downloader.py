@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 import ssl
+import zipfile
 from pathlib import Path
 
 import certifi
@@ -161,6 +162,38 @@ def find_cover_in_tree(root: Path) -> str | None:
                 if grandchild.is_file() and grandchild.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp"):
                     return str(grandchild)
     return None
+
+
+_COVER_IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp")
+
+
+def extract_first_image_as_cover(archive_path: Path) -> str | None:
+    """Best-effort cover for a single-file archive download (cbz/zip/epub —
+    anything that's really a zip) whose source listing had no cover image
+    at all: the book's own first page/image is a much better thumbnail
+    than a blank one in the library grid. Silently gives up on anything
+    that isn't a valid zip (a genuine RAR-compressed .cbr, for instance) —
+    this is a nice-to-have, not something worth surfacing as an error."""
+    try:
+        with zipfile.ZipFile(archive_path) as zf:
+            names = sorted(
+                name
+                for name in zf.namelist()
+                if not name.endswith("/") and Path(name).suffix.lower() in _COVER_IMAGE_EXTS
+            )
+            if not names:
+                return None
+            first = names[0]
+            data = zf.read(first)
+    except (zipfile.BadZipFile, OSError, KeyError):
+        return None
+
+    cover_path = archive_path.with_suffix(f".cover{Path(first).suffix.lower()}")
+    try:
+        cover_path.write_bytes(data)
+    except OSError:
+        return None
+    return str(cover_path)
 
 
 _IMG_ATTRS = (

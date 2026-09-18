@@ -117,6 +117,7 @@ const el = {
   updateStatus: document.getElementById("update-status"),
   updateDownloadLink: document.getElementById("update-download-link"),
   updateInstallBtn: document.getElementById("update-install-btn"),
+  updateCancelBtn: document.getElementById("update-cancel-btn"),
   updateProgress: document.getElementById("update-progress"),
   updateProgressBar: document.getElementById("update-progress-bar"),
   themeIcon: document.getElementById("theme-icon"),
@@ -151,6 +152,7 @@ const el = {
   detailSynopsis: document.getElementById("detail-synopsis"),
   readerBack: document.getElementById("reader-back"),
   readerFullscreen: document.getElementById("reader-fullscreen"),
+  readerFullscreenExit: document.getElementById("reader-fullscreen-exit"),
   readerTitle: document.getElementById("reader-title"),
   readerToc: document.getElementById("reader-toc"),
   readerViewer: document.getElementById("reader-viewer"),
@@ -270,15 +272,14 @@ applyTheme(getTheme());
 // ---- update check ----
 // build-info.json is a plain static file (not an /api/ route), regenerated
 // fresh at build time by release.yml with this specific build's own commit
-// + build timestamp — desktop/Android/web dev builds all keep their own
-// copy in assets/web/. There's no meaningfully incrementing version number
-// in this project's release flow (the same v1.0.0 tag's assets just get
-// replaced on every rebuild), so "is there an update" is answered by
-// comparing this build's timestamp against the Android APK release
-// asset's own last-replaced time — the actual file someone would
-// download, not just "did main move" (a release isn't necessarily
-// rebuilt after every commit).
-const ANDROID_APK_ASSET_RE = /\.apk$/i;
+// — desktop/Android/web dev builds all keep their own copy in assets/web/.
+// There's no meaningfully incrementing version number in this project's
+// release flow (the same v1.0.0 tag's assets just get replaced on every
+// rebuild), so "is there an update" is answered by comparing commits, not
+// timestamps: a build-time timestamp and the release asset's "replaced at"
+// time are always minutes apart just from how long the CI pipeline takes
+// to build+upload, so that comparison flags every single build as
+// "outdated" the moment it's done — including compared to itself.
 let pendingUpdateApkUrl = null;
 const hasAndroidAutoUpdate = () =>
   Boolean(window.SapphireBoxAndroid && typeof window.SapphireBoxAndroid.hasAutoUpdate === "function" && window.SapphireBoxAndroid.hasAutoUpdate());
@@ -288,6 +289,7 @@ async function checkForUpdates() {
   el.updateInstallBtn.hidden = true;
   el.updateInstallBtn.disabled = false;
   el.updateInstallBtn.textContent = "Atualizar agora";
+  el.updateCancelBtn.hidden = true;
   el.updateProgress.hidden = true;
   el.updateProgressBar.style.width = "0%";
   el.updateStatus.textContent = "Verificando…";
@@ -295,32 +297,30 @@ async function checkForUpdates() {
   try {
     const infoRes = await fetch("build-info.json", { cache: "no-store" });
     const info = infoRes.ok ? await infoRes.json() : {};
-    const builtAt = info.builtAt ? new Date(info.builtAt) : null;
+    const localCommit = info.commit || null;
 
-    const ghRes = await fetch("https://api.github.com/repos/juankalleo/sapphire-box/releases/latest", { cache: "no-store" });
-    if (!ghRes.ok) throw new Error(`GitHub respondeu ${ghRes.status}`);
-    const release = await ghRes.json();
-    const apkAsset = (release.assets || []).find((a) => ANDROID_APK_ASSET_RE.test(a.name));
+    const [commitRes, releaseRes] = await Promise.all([
+      fetch("https://api.github.com/repos/juankalleo/sapphire-box/commits/main", { cache: "no-store" }),
+      fetch("https://api.github.com/repos/juankalleo/sapphire-box/releases/latest", { cache: "no-store" }),
+    ]);
+    if (!commitRes.ok) throw new Error(`GitHub respondeu ${commitRes.status}`);
+    const latestCommit = (await commitRes.json()).sha || null;
+    const release = releaseRes.ok ? await releaseRes.json() : { assets: [] };
+    const apkAsset = (release.assets || []).find((a) => /\.apk$/i.test(a.name));
 
-    if (!builtAt || Number.isNaN(builtAt.getTime())) {
-      el.updateStatus.textContent = "Essa build não tem data gravada pra comparar (build de desenvolvimento). Use o link abaixo pra ver a versão mais recente.";
+    if (!localCommit || localCommit === "dev") {
+      el.updateStatus.textContent = `Essa build não tem um commit gravado pra comparar (build de desenvolvimento). Commit mais recente no GitHub: ${latestCommit ? latestCommit.slice(0, 7) : "?"}.`;
       el.updateDownloadLink.hidden = false;
       return;
     }
-    if (!apkAsset) {
-      el.updateStatus.textContent = "Não achei o APK na última release do GitHub.";
-      el.updateDownloadLink.hidden = false;
+
+    if (localCommit === latestCommit) {
+      el.updateStatus.textContent = `Você já está na versão mais recente (commit ${localCommit.slice(0, 7)}).`;
       return;
     }
 
-    const releaseUpdatedAt = new Date(apkAsset.updated_at);
-    if (releaseUpdatedAt.getTime() <= builtAt.getTime()) {
-      el.updateStatus.textContent = "Você já está na versão mais recente.";
-      return;
-    }
-
-    el.updateStatus.textContent = `Tem atualização disponível (publicada em ${releaseUpdatedAt.toLocaleString("pt-BR")}).`;
-    if (hasAndroidAutoUpdate()) {
+    el.updateStatus.textContent = `Tem atualização disponível. Sua build: ${localCommit.slice(0, 7)} · mais recente: ${latestCommit ? latestCommit.slice(0, 7) : "?"}.`;
+    if (hasAndroidAutoUpdate() && apkAsset) {
       pendingUpdateApkUrl = apkAsset.browser_download_url;
       el.updateInstallBtn.hidden = false;
     } else {
@@ -337,6 +337,7 @@ function openUpdateModal() {
 }
 
 function closeUpdateModal() {
+  if (updateDownloadInProgress) cancelUpdateDownload();
   el.updateModal.hidden = true;
 }
 
@@ -344,26 +345,49 @@ el.updateCheckBtn.addEventListener("click", openUpdateModal);
 el.updateClose.addEventListener("click", closeUpdateModal);
 el.updateCloseBtn.addEventListener("click", closeUpdateModal);
 
+let updateDownloadInProgress = false;
+
+function resetUpdateDownloadUi() {
+  updateDownloadInProgress = false;
+  el.updateInstallBtn.hidden = !pendingUpdateApkUrl;
+  el.updateInstallBtn.disabled = false;
+  el.updateInstallBtn.textContent = "Atualizar agora";
+  el.updateCancelBtn.hidden = true;
+  el.updateProgress.hidden = true;
+  el.updateProgressBar.style.width = "0%";
+}
+
+function cancelUpdateDownload() {
+  if (window.SapphireBoxAndroid && typeof window.SapphireBoxAndroid.cancelUpdateDownload === "function") {
+    window.SapphireBoxAndroid.cancelUpdateDownload();
+  }
+  resetUpdateDownloadUi();
+  el.updateStatus.textContent = "Download cancelado.";
+}
+
 el.updateInstallBtn.addEventListener("click", () => {
   if (!pendingUpdateApkUrl || !window.SapphireBoxAndroid) return;
-  el.updateInstallBtn.disabled = true;
-  el.updateInstallBtn.textContent = "Baixando…";
+  updateDownloadInProgress = true;
+  el.updateInstallBtn.hidden = true;
+  el.updateCancelBtn.hidden = false;
   el.updateProgress.hidden = false;
   el.updateProgressBar.style.width = "0%";
   el.updateStatus.textContent = "Baixando atualização…";
   window.SapphireBoxAndroid.downloadAndInstallUpdate(pendingUpdateApkUrl);
 });
 
+el.updateCancelBtn.addEventListener("click", cancelUpdateDownload);
+
 // Called by MainActivity.kt while the update APK downloads, and if the
 // download or the handoff to the system installer fails.
 window.onSapphireBoxUpdateProgress = (pct) => {
+  if (!updateDownloadInProgress) return;
   el.updateProgressBar.style.width = `${Math.max(0, Math.min(100, pct))}%`;
   el.updateStatus.textContent = pct >= 100 ? "Abrindo o instalador…" : `Baixando atualização… ${pct}%`;
 };
 
 window.onSapphireBoxUpdateError = (message) => {
-  el.updateInstallBtn.disabled = false;
-  el.updateInstallBtn.textContent = "Tentar de novo";
+  resetUpdateDownloadUi();
   el.updateStatus.textContent = `Não deu pra atualizar: ${message}`;
 };
 
@@ -1490,9 +1514,17 @@ window.onSapphireBoxFolderPicked = (path) => {
   saveLibraryPath(path);
 };
 
-window.onSapphireBoxFolderPickFailed = () => {
-  el.libraryPathHint.textContent =
-    "Não deu pra usar essa pasta. Se apareceu a tela de permissão, aceite \"Acesso a todos os arquivos\" e tente de novo — ou digite o caminho manualmente.";
+const FOLDER_PICK_FAILURE_MESSAGES = {
+  WRONG_PROVIDER:
+    "Essa pasta veio de um atalho (tipo \"Downloads\" ou \"Recentes\") que o app não consegue usar. Abre o seletor de novo e navega até \"Armazenamento interno\" no menu lateral pra escolher a pasta lá dentro.",
+  UNSUPPORTED_VOLUME:
+    "Cartão SD ou armazenamento externo ainda não é suportado pra essa escolha — escolha uma pasta dentro do armazenamento interno principal, ou digite o caminho manualmente.",
+  OTHER:
+    "Não deu pra usar essa pasta. Se apareceu a tela de permissão, aceite \"Acesso a todos os arquivos\" e tente de novo — ou digite o caminho manualmente.",
+};
+
+window.onSapphireBoxFolderPickFailed = (reason) => {
+  el.libraryPathHint.textContent = FOLDER_PICK_FAILURE_MESSAGES[reason] || FOLDER_PICK_FAILURE_MESSAGES.OTHER;
 };
 
 el.settingsClearLibrary.addEventListener("click", async () => {
@@ -1643,18 +1675,19 @@ function isFullscreenActive() {
   return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
 }
 
+// The header's own fullscreen button is outside #reader-viewer, so once
+// that element goes fullscreen the button (and the rest of the header/
+// toolbar) simply isn't rendered any more — fullscreen only paints the
+// fullscreened element's own subtree. The floating exit button lives
+// inside #reader-viewer specifically so there's still a way out.
 function updateFullscreenIcon() {
-  const active = isFullscreenActive();
-  el.readerFullscreen.title = active ? "Sair da tela cheia" : "Tela cheia";
-  el.readerFullscreen.innerHTML = active
-    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v3a2 2 0 0 1-2 2H4M15 3v3a2 2 0 0 0 2 2h3M9 21v-3a2 2 0 0 0-2-2H4M15 21v-3a2 2 0 0 1 2-2h3"/></svg>'
-    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/></svg>';
+  el.readerFullscreenExit.hidden = !isFullscreenActive();
 }
 
 async function toggleFullscreen() {
   try {
     if (!isFullscreenActive()) {
-      const target = el.readerView;
+      const target = el.readerViewer;
       const request = target.requestFullscreen || target.webkitRequestFullscreen;
       if (request) await request.call(target);
     } else {
@@ -1667,6 +1700,7 @@ async function toggleFullscreen() {
 }
 
 el.readerFullscreen.addEventListener("click", toggleFullscreen);
+el.readerFullscreenExit.addEventListener("click", toggleFullscreen);
 document.addEventListener("fullscreenchange", updateFullscreenIcon);
 document.addEventListener("webkitfullscreenchange", updateFullscreenIcon);
 

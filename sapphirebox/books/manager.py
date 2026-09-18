@@ -9,6 +9,7 @@ from pathlib import Path
 from sapphirebox.books.sources import registry
 from sapphirebox.core import relevance
 from sapphirebox.core.config import get_books_library_path
+from sapphirebox.core.downloader import extract_first_image_as_cover
 from sapphirebox.core.models import Book
 from sapphirebox.library import repository
 
@@ -107,6 +108,8 @@ def download(book: Book, dest_dir: Path | None = None, on_progress=None) -> Book
 
     dest_dir = dest_dir or get_books_library_path()
     book = source.download(book, dest_dir, on_progress)
+    if not book.cover_path and book.local_path:
+        book.cover_path = extract_first_image_as_cover(Path(book.local_path))
     repository.upsert_book(book)
     return book
 

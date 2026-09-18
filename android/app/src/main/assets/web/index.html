@@ -253,6 +253,9 @@
           <div class="reader-body">
             <aside class="reader-toc" id="reader-toc"></aside>
             <div class="reader-viewer" id="reader-viewer">
+              <button type="button" id="reader-fullscreen-exit" class="reader-fullscreen-exit" hidden title="Sair da tela cheia">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v3a2 2 0 0 1-2 2H4M15 3v3a2 2 0 0 0 2 2h3M9 21v-3a2 2 0 0 0-2-2H4M15 21v-3a2 2 0 0 1 2-2h3"/></svg>
+              </button>
               <div class="reader-manga" id="reader-manga" hidden>
                 <button type="button" class="reader-nav prev" id="reader-page-prev" aria-label="Página anterior">‹</button>
                 <img id="reader-page-img" alt="">
@@ -374,6 +377,7 @@
       </div>
       <div class="format-actions">
         <a class="primary-action" id="update-download-link" href="https://github.com/juankalleo/sapphire-box/releases/latest" target="_blank" rel="noopener" hidden>Baixar atualização</a>
+        <button type="button" class="secondary-action" id="update-cancel-btn" hidden>Cancelar</button>
         <button type="button" class="primary-action" id="update-install-btn" hidden>Atualizar agora</button>
         <button type="button" class="secondary-action" id="update-close-btn">Fechar</button>
       </div>

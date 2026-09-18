@@ -24,6 +24,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
@@ -33,6 +34,9 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.webkit.WebViewAssetLoader
 import com.chaquo.python.PyObject
 import com.chaquo.python.Python
@@ -68,6 +72,17 @@ class MainActivity : AppCompatActivity() {
     // "open browser, find the file, remember to come back" detour.
     private lateinit var installSourceLauncher: ActivityResultLauncher<Intent>
     private var pendingUpdateUrl: String? = null
+    @Volatile private var updateDownloadCancelled = false
+    @Volatile private var activeUpdateConnection: HttpURLConnection? = null
+
+    // The reader's "tela cheia" button calls the web Fullscreen API
+    // (Element.requestFullscreen()) — Android's WebView doesn't render that
+    // itself, it just hands the fullscreen content to the app as a plain
+    // View via onShowCustomView, expecting the app to display it (this is
+    // also how <video> fullscreen works). Without this, requestFullscreen()
+    // silently does nothing, same class of gap as confirm()/alert() earlier.
+    private var fullscreenCustomView: View? = null
+    private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -78,8 +93,8 @@ class MainActivity : AppCompatActivity() {
                 notifyFolderPickFailed()
                 return@registerForActivityResult
             }
-            val resolved = resolvePickedFolder(uri)
-            if (resolved != null) notifyFolderPicked(resolved) else notifyFolderPickFailed()
+            val (resolved, failureReason) = resolvePickedFolder(uri)
+            if (resolved != null) notifyFolderPicked(resolved) else notifyFolderPickFailed(failureReason)
         }
         allFilesAccessLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             if (!pendingFolderPickAfterPermission) return@registerForActivityResult
@@ -210,6 +225,27 @@ class MainActivity : AppCompatActivity() {
                     .show()
                 return true
             }
+
+            override fun onShowCustomView(view: View, callback: WebChromeClient.CustomViewCallback) {
+                if (fullscreenCustomView != null) {
+                    callback.onCustomViewHidden()
+                    return
+                }
+                fullscreenCustomView = view
+                fullscreenCallback = callback
+                (window.decorView as FrameLayout).addView(
+                    view,
+                    FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+                )
+                hideSystemBars()
+            }
+
+            override fun onHideCustomView() {
+                (window.decorView as FrameLayout).removeView(fullscreenCustomView)
+                fullscreenCustomView = null
+                fullscreenCallback = null
+                showSystemBars()
+            }
         }
 
         retryButton.setOnClickListener {
@@ -221,7 +257,9 @@ class MainActivity : AppCompatActivity() {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (webView.visibility == View.VISIBLE && webView.canGoBack()) {
+                if (fullscreenCustomView != null) {
+                    fullscreenCallback?.onCustomViewHidden()
+                } else if (webView.visibility == View.VISIBLE && webView.canGoBack()) {
                     webView.goBack()
                 } else {
                     isEnabled = false
@@ -229,6 +267,18 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         })
+    }
+
+    private fun hideSystemBars() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    }
+
+    private fun showSystemBars() {
+        WindowCompat.setDecorFitsSystemWindows(window, true)
+        WindowInsetsControllerCompat(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
     }
 
     private fun loadBundledApp() {
@@ -402,12 +452,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** Resolves a SAF tree Uri to a plain filesystem path. Only works for
-     * the primary storage volume — layout for SD cards and other secondary
-     * volumes isn't standardized across devices, so those are left
-     * unsupported (caller falls back to the manual path field) rather than
-     * guessing a path that might not exist. */
-    private fun resolvePickedFolder(treeUri: Uri): String? {
+    /** Resolves a SAF tree Uri to a plain filesystem path. Only works for a
+     * folder picked from "Internal storage" (the externalstorage provider,
+     * primary volume) — the Android picker also lists shortcuts like
+     * "Downloads" (a different provider, com.android.providers.downloads,
+     * with document IDs that aren't a plain "primary:relative/path" at
+     * all) and, on some devices, an SD card (a real secondary volume, with
+     * device-specific path layout). Both are left unsupported rather than
+     * guessing a path that might not exist — the caller reports *why*
+     * (see FolderPickFailure) so the message actually points at picking a
+     * different location instead of blaming a permission that's already
+     * granted by the time this runs. */
+    private enum class FolderPickFailure { WRONG_PROVIDER, UNSUPPORTED_VOLUME, OTHER }
+
+    private fun resolvePickedFolder(treeUri: Uri): Pair<String?, FolderPickFailure> {
         try {
             contentResolver.takePersistableUriPermission(
                 treeUri,
@@ -417,18 +475,24 @@ class MainActivity : AppCompatActivity() {
             // Not fatal on its own — still try to use the resolved path below.
         }
 
+        if (treeUri.authority != "com.android.externalstorage.documents") {
+            return null to FolderPickFailure.WRONG_PROVIDER
+        }
+
         val docId = try {
             DocumentsContract.getTreeDocumentId(treeUri)
         } catch (_: Exception) {
-            return null
+            return null to FolderPickFailure.OTHER
         }
         val split = docId.split(":", limit = 2)
-        if (split.size != 2 || !split[0].equals("primary", ignoreCase = true)) return null
+        if (split.size != 2 || !split[0].equals("primary", ignoreCase = true)) {
+            return null to FolderPickFailure.UNSUPPORTED_VOLUME
+        }
 
         val root = Environment.getExternalStorageDirectory()
         val relativePath = split[1]
         val folder = if (relativePath.isBlank()) root else File(root, relativePath)
-        return folder.absolutePath
+        return folder.absolutePath to FolderPickFailure.OTHER
     }
 
     private fun notifyFolderPicked(path: String) {
@@ -438,9 +502,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun notifyFolderPickFailed() {
+    private fun notifyFolderPickFailed(reason: FolderPickFailure = FolderPickFailure.OTHER) {
+        val escaped = JSONObject.quote(reason.name)
         webView.post {
-            webView.evaluateJavascript("window.onSapphireBoxFolderPickFailed && window.onSapphireBoxFolderPickFailed()", null)
+            webView.evaluateJavascript("window.onSapphireBoxFolderPickFailed && window.onSapphireBoxFolderPickFailed($escaped)", null)
         }
     }
 
@@ -462,16 +527,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startApkDownload(url: String) {
+        updateDownloadCancelled = false
         Thread {
             var connection: HttpURLConnection? = null
+            val apkFile = File(cacheDir, "update.apk")
             try {
-                val apkFile = File(cacheDir, "update.apk")
                 connection = (URL(url).openConnection() as HttpURLConnection).apply {
                     instanceFollowRedirects = true
                     connectTimeout = 20_000
                     readTimeout = 20_000
                     connect()
                 }
+                activeUpdateConnection = connection
+                if (updateDownloadCancelled) return@Thread
                 if (connection.responseCode !in 200..299) {
                     notifyUpdateError("O servidor respondeu ${connection.responseCode} ao baixar o APK.")
                     return@Thread
@@ -483,6 +551,7 @@ class MainActivity : AppCompatActivity() {
                     apkFile.outputStream().use { output ->
                         val buffer = ByteArray(64 * 1024)
                         while (true) {
+                            if (updateDownloadCancelled) return@Thread
                             val read = input.read(buffer)
                             if (read <= 0) break
                             output.write(buffer, 0, read)
@@ -497,13 +566,22 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                 }
+                if (updateDownloadCancelled) return@Thread
                 installApk(apkFile)
             } catch (error: Exception) {
-                notifyUpdateError(error.message ?: error.javaClass.simpleName)
+                if (!updateDownloadCancelled) notifyUpdateError(error.message ?: error.javaClass.simpleName)
             } finally {
+                activeUpdateConnection = null
                 connection?.disconnect()
+                if (updateDownloadCancelled) apkFile.delete()
             }
         }.start()
+    }
+
+    private fun stopUpdateDownload() {
+        updateDownloadCancelled = true
+        pendingUpdateUrl = null
+        activeUpdateConnection?.disconnect()
     }
 
     private fun installApk(file: File) {
@@ -569,6 +647,11 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun downloadAndInstallUpdate(apkUrl: String) {
             runOnUiThread { beginUpdateDownload(apkUrl) }
+        }
+
+        @JavascriptInterface
+        fun cancelUpdateDownload() {
+            runOnUiThread { stopUpdateDownload() }
         }
     }
 }
