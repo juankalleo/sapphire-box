@@ -512,7 +512,7 @@ body{
   box-shadow:0 2px 18px rgba(0,0,0,.28); background:#09090a;
 }
 .reader-nav{
-  position:absolute; top:0; bottom:0; width:15%; border:none; background:none; cursor:pointer;
+  position:absolute; top:0; bottom:0; width:15%; z-index:5; border:none; background:none; cursor:pointer;
   color:var(--text-secondary); font-size:32px; opacity:0; transition:opacity .15s, background .15s;
 }
 .reader-nav:hover{opacity:1; background:rgba(0,0,0,0.08);}

@@ -183,6 +183,8 @@ const el = {
   readerTextMode: document.getElementById("reader-text-mode"),
   readerModePages: document.getElementById("reader-mode-pages"),
   readerModeContinuous: document.getElementById("reader-mode-continuous"),
+  readerTurnTap: document.getElementById("reader-turn-tap"),
+  readerTurnSwipe: document.getElementById("reader-turn-swipe"),
   formatModal: document.getElementById("format-modal"),
   formatClose: document.getElementById("format-close"),
   formatBook: document.getElementById("format-book"),
@@ -1625,6 +1627,8 @@ function resetReaderPanels() {
   el.readerTextMode.onclick = null;
   el.readerModePages.hidden = true;
   el.readerModeContinuous.hidden = true;
+  el.readerTurnTap.hidden = true;
+  el.readerTurnSwipe.hidden = true;
   el.readerToc.innerHTML = "";
   el.readerView.classList.remove("reader-continuous-mode");
   if (epubBook) {
@@ -1812,7 +1816,40 @@ el.readerThemePage.addEventListener("click", () => {
   applyReaderPaperMode();
 });
 
-// ---- pinch-to-zoom ----
+// ---- page-turn method: tap zones vs swipe ----
+// Some formats/readers feel more natural flipped by dragging a finger
+// across the page (like a real book) instead of tapping an edge — this
+// mirrors the choice most e-reader apps offer, persisted the same way as
+// the pages/continuous layout choice. Swiping only makes sense in paged
+// mode (continuous already navigates by scrolling).
+const READER_TURN_KEY = "sapphirebox-reader-turn-mode";
+let readerTurnMode = localStorage.getItem(READER_TURN_KEY) || "tap";
+
+function updateReaderTurnButtons() {
+  el.readerTurnTap.classList.toggle("active", readerTurnMode === "tap");
+  el.readerTurnSwipe.classList.toggle("active", readerTurnMode === "swipe");
+}
+
+function applyReaderTurnMode() {
+  const tapEnabled = readerTurnMode === "tap";
+  [el.readerPagePrev, el.readerPageNext, el.readerPdfPrev, el.readerPdfNext, el.readerEpubPrev, el.readerEpubNext].forEach((btn) => {
+    if (btn) btn.style.display = tapEnabled ? "" : "none";
+  });
+}
+
+function setReaderTurnMode(mode) {
+  readerTurnMode = mode === "swipe" ? "swipe" : "tap";
+  localStorage.setItem(READER_TURN_KEY, readerTurnMode);
+  updateReaderTurnButtons();
+  applyReaderTurnMode();
+}
+
+el.readerTurnTap.addEventListener("click", () => setReaderTurnMode("tap"));
+el.readerTurnSwipe.addEventListener("click", () => setReaderTurnMode("swipe"));
+updateReaderTurnButtons();
+applyReaderTurnMode();
+
+// ---- pinch-to-zoom (two fingers) + swipe-to-turn (one finger) ----
 // The WebView's own native page-zoom would scale the whole app UI
 // (sidebar included, not just the page), doesn't know about this app's
 // own zoom percentage, and — inside the Fullscreen API's custom view
@@ -1822,40 +1859,44 @@ el.readerThemePage.addEventListener("click", () => {
 // the gesture live; the real content (a full canvas re-render for PDF,
 // image width for manga) is only recomputed once the fingers lift —
 // re-rendering a PDF page on every touchmove tick would never keep up
-// with a finger.
+// with a finger. The same listeners also track a one-finger horizontal
+// drag for swipe-to-turn, since both need to watch the same touch
+// sequence to tell "two fingers pinching" from "one finger swiping"
+// apart from the start.
 let pinchStartDistance = 0;
 let pinchStartZoom = 100;
 let pinchLiveZoom = 100;
+let swipeStartX = 0;
+let swipeStartY = 0;
+let swipeTracking = false;
 
 function touchDistance(touches) {
   return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
 }
 
-el.readerViewer.addEventListener(
-  "touchstart",
-  (evt) => {
-    if (evt.touches.length === 2) {
-      pinchStartDistance = touchDistance(evt.touches);
-      pinchStartZoom = readerZoom;
-      pinchLiveZoom = readerZoom;
-    }
-  },
-  { passive: true }
-);
+function handleReaderTouchStart(evt) {
+  if (evt.touches.length === 2) {
+    swipeTracking = false;
+    pinchStartDistance = touchDistance(evt.touches);
+    pinchStartZoom = readerZoom;
+    pinchLiveZoom = readerZoom;
+  } else if (evt.touches.length === 1 && readerTurnMode === "swipe" && readerLayoutMode !== "continuous") {
+    swipeTracking = true;
+    swipeStartX = evt.touches[0].clientX;
+    swipeStartY = evt.touches[0].clientY;
+  }
+}
 
-el.readerViewer.addEventListener(
-  "touchmove",
-  (evt) => {
-    if (evt.touches.length === 2 && pinchStartDistance > 0) {
-      evt.preventDefault();
-      const scale = touchDistance(evt.touches) / pinchStartDistance;
-      pinchLiveZoom = Math.max(60, Math.min(190, pinchStartZoom * scale));
-      el.readerViewer.style.transformOrigin = "center center";
-      el.readerViewer.style.transform = `scale(${pinchLiveZoom / pinchStartZoom})`;
-    }
-  },
-  { passive: false }
-);
+function handleReaderTouchMove(evt) {
+  if (evt.touches.length === 2 && pinchStartDistance > 0) {
+    evt.preventDefault();
+    swipeTracking = false;
+    const scale = touchDistance(evt.touches) / pinchStartDistance;
+    pinchLiveZoom = Math.max(60, Math.min(190, pinchStartZoom * scale));
+    el.readerViewer.style.transformOrigin = "center center";
+    el.readerViewer.style.transform = `scale(${pinchLiveZoom / pinchStartZoom})`;
+  }
+}
 
 function endPinch() {
   if (pinchStartDistance === 0) return;
@@ -1865,8 +1906,56 @@ function endPinch() {
   applyReaderZoom();
 }
 
-el.readerViewer.addEventListener("touchend", endPinch);
-el.readerViewer.addEventListener("touchcancel", endPinch);
+function handleReaderTouchEnd(evt) {
+  endPinch();
+  if (!swipeTracking) return;
+  swipeTracking = false;
+  const touch = evt.changedTouches && evt.changedTouches[0];
+  if (!touch) return;
+  const dx = touch.clientX - swipeStartX;
+  const dy = touch.clientY - swipeStartY;
+  if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+    if (dx < 0) readerGoNext();
+    else readerGoPrev();
+  }
+}
+
+function handleReaderTouchCancel() {
+  endPinch();
+  swipeTracking = false;
+}
+
+function attachReaderTouchHandlers(target) {
+  target.addEventListener("touchstart", handleReaderTouchStart, { passive: true });
+  target.addEventListener("touchmove", handleReaderTouchMove, { passive: false });
+  target.addEventListener("touchend", handleReaderTouchEnd);
+  target.addEventListener("touchcancel", handleReaderTouchCancel);
+}
+
+attachReaderTouchHandlers(el.readerViewer);
+
+// EPUB pages render inside an <iframe> that epub.js manages — touches
+// landing on that content fire in the iframe's OWN document and never
+// bubble out to the parent page (a normal cross-document boundary, not a
+// bug in epub.js), so the listeners above alone never see a finger that
+// lands on the actual text. Re-attaching the same handlers straight onto
+// each rendered iframe's document — done from the "rendered" hook set up
+// where the EPUB is opened — is what makes pinch-zoom and edge taps work
+// there too. The pinch preview transform still targets el.readerViewer
+// (a normal element in the parent document), so that part needs no
+// special handling once the gesture's numbers are computed.
+const epubTouchDocuments = new WeakSet();
+
+// epub.js's rendition "rendered" event hands back a View instance, not a
+// plain object — the iframe's document lives at .document on some
+// versions/managers and at .contents.document on others, so both are
+// checked rather than betting on one internal shape.
+function attachEpubTouchHandlers(view) {
+  const doc = (view && (view.document || (view.contents && view.contents.document))) || null;
+  if (!doc || epubTouchDocuments.has(doc)) return;
+  epubTouchDocuments.add(doc);
+  attachReaderTouchHandlers(doc);
+}
 
 function updateReaderModeButtons() {
   el.readerModePages.classList.toggle("active", readerLayoutMode === "pages");
@@ -1876,6 +1965,8 @@ function updateReaderModeButtons() {
 function setImageReaderControlsVisible(visible) {
   el.readerModePages.hidden = !visible;
   el.readerModeContinuous.hidden = !visible;
+  el.readerTurnTap.hidden = !visible;
+  el.readerTurnSwipe.hidden = !visible;
   updateReaderModeButtons();
 }
 
@@ -2411,6 +2502,7 @@ function openBookReader(item) {
         });
         epubRendition = rendition;
         applyEpubReaderTheme();
+        rendition.on("rendered", (section, view) => attachEpubTouchHandlers(view));
         rendition.on("relocated", (loc) => {
           if (loc && loc.start && loc.start.cfi) {
             saveReadingState(item.id, "epub", { location: loc.start.cfi });
