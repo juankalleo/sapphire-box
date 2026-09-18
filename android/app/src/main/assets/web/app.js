@@ -172,6 +172,8 @@ const el = {
   readerPdfStrip: document.getElementById("reader-pdf-strip"),
   readerText: document.getElementById("reader-text"),
   readerEpub: document.getElementById("reader-epub"),
+  readerEpubPrev: document.getElementById("reader-epub-prev"),
+  readerEpubNext: document.getElementById("reader-epub-next"),
   readerEmpty: document.getElementById("reader-empty"),
   readerZoomOut: document.getElementById("reader-zoom-out"),
   readerZoomLabel: document.getElementById("reader-zoom-label"),
@@ -420,6 +422,48 @@ function resolveCoverSrc(coverPath) {
   return `/api/cover?path=${encodeURIComponent(coverPath)}`;
 }
 
+// PDFs downloaded with no cover from their source can't get one the same
+// way cbz/epub/zip do server-side (extracting the first image from a
+// plain zip) — rendering a PDF page needs a real PDF engine, and adding
+// one on the Python side is a heavy, Android-risky new dependency this
+// app can't safely take on. pdf.js is already loaded for the reader
+// itself, so it renders page 1 here instead, once per book, and hands
+// the image back to /api/library/books/cover to save — so this only
+// costs a full PDF fetch+render the first time a library card for that
+// book is shown, not on every subsequent library load.
+const pdfCoverAttempts = new Set();
+
+async function tryGeneratePdfCover(item, imgEl) {
+  if (item.format !== "pdf" || !item.id || !window.pdfjsLib || pdfCoverAttempts.has(item.id)) return;
+  pdfCoverAttempts.add(item.id);
+  let doc = null;
+  try {
+    doc = await window.pdfjsLib.getDocument(`/api/library/books/file?id=${encodeURIComponent(item.id)}`).promise;
+    const page = await doc.getPage(1);
+    const viewport = page.getViewport({ scale: 0.5 });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.72);
+
+    const saved = await fetchJSON("/api/library/books/cover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: item.id, dataUrl }),
+    });
+    item.coverPath = saved.coverPath;
+    if (imgEl && imgEl.isConnected) {
+      imgEl.src = resolveCoverSrc(saved.coverPath);
+      imgEl.style.display = "";
+    }
+  } catch (err) {
+    console.error("pdf cover generation failed", err);
+  } finally {
+    if (doc) doc.destroy();
+  }
+}
+
 function bytesFromBase64(value) {
   const raw = atob(value || "");
   const bytes = new Uint8Array(raw.length);
@@ -566,6 +610,9 @@ function renderCards(items, mode, container = el.grid) {
       img.src = coverSrc;
       img.alt = title.textContent;
       img.onerror = () => { img.remove(); };
+    } else if (mode === "library" && item.format === "pdf") {
+      img.style.display = "none";
+      tryGeneratePdfCover(item, img);
     } else {
       img.remove();
     }
@@ -1254,6 +1301,9 @@ function renderListRow(item, container) {
     img.src = listCoverSrc;
     img.alt = title.textContent;
     img.onerror = () => { img.remove(); };
+  } else if (item.format === "pdf") {
+    img.style.display = "none";
+    tryGeneratePdfCover(item, img);
   } else {
     img.remove();
   }
@@ -1670,6 +1720,8 @@ el.readerPrev.addEventListener("click", readerGoPrev);
 el.readerNext.addEventListener("click", readerGoNext);
 el.readerPdfPrev.addEventListener("click", readerGoPrev);
 el.readerPdfNext.addEventListener("click", readerGoNext);
+el.readerEpubPrev.addEventListener("click", readerGoPrev);
+el.readerEpubNext.addEventListener("click", readerGoNext);
 
 function isFullscreenActive() {
   return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
@@ -1760,6 +1812,62 @@ el.readerThemePage.addEventListener("click", () => {
   applyReaderPaperMode();
 });
 
+// ---- pinch-to-zoom ----
+// The WebView's own native page-zoom would scale the whole app UI
+// (sidebar included, not just the page), doesn't know about this app's
+// own zoom percentage, and — inside the Fullscreen API's custom view
+// specifically — didn't seem to respond to the gesture at all. Handled
+// as a plain two-finger touch gesture instead, driving the exact same
+// readerZoom state as the +/- buttons. A cheap CSS transform previews
+// the gesture live; the real content (a full canvas re-render for PDF,
+// image width for manga) is only recomputed once the fingers lift —
+// re-rendering a PDF page on every touchmove tick would never keep up
+// with a finger.
+let pinchStartDistance = 0;
+let pinchStartZoom = 100;
+let pinchLiveZoom = 100;
+
+function touchDistance(touches) {
+  return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+}
+
+el.readerViewer.addEventListener(
+  "touchstart",
+  (evt) => {
+    if (evt.touches.length === 2) {
+      pinchStartDistance = touchDistance(evt.touches);
+      pinchStartZoom = readerZoom;
+      pinchLiveZoom = readerZoom;
+    }
+  },
+  { passive: true }
+);
+
+el.readerViewer.addEventListener(
+  "touchmove",
+  (evt) => {
+    if (evt.touches.length === 2 && pinchStartDistance > 0) {
+      evt.preventDefault();
+      const scale = touchDistance(evt.touches) / pinchStartDistance;
+      pinchLiveZoom = Math.max(60, Math.min(190, pinchStartZoom * scale));
+      el.readerViewer.style.transformOrigin = "center center";
+      el.readerViewer.style.transform = `scale(${pinchLiveZoom / pinchStartZoom})`;
+    }
+  },
+  { passive: false }
+);
+
+function endPinch() {
+  if (pinchStartDistance === 0) return;
+  pinchStartDistance = 0;
+  el.readerViewer.style.transform = "";
+  readerZoom = pinchLiveZoom;
+  applyReaderZoom();
+}
+
+el.readerViewer.addEventListener("touchend", endPinch);
+el.readerViewer.addEventListener("touchcancel", endPinch);
+
 function updateReaderModeButtons() {
   el.readerModePages.classList.toggle("active", readerLayoutMode === "pages");
   el.readerModeContinuous.classList.toggle("active", readerLayoutMode === "continuous");
@@ -1847,6 +1955,8 @@ function setReaderLayoutMode(mode) {
   } else if (pdfDoc && el.readerText.hidden) {
     if (readerLayoutMode === "continuous") renderContinuousPdfReader(pdfPageNum);
     else renderPagedPdfReader(pdfPageNum);
+  } else if (epubRendition) {
+    epubRendition.flow(readerLayoutMode === "continuous" ? "scrolled-doc" : "paginated");
   }
 }
 
@@ -2286,6 +2396,7 @@ function openBookReader(item) {
     // Fetching the bytes ourselves and handing epub.js the ArrayBuffer
     // sidesteps its URL heuristics entirely — it accepts binary data
     // directly just as well as a URL.
+    setImageReaderControlsVisible(true);
     apiFetch(fileUrl)
       .then((resp) => {
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -2293,7 +2404,11 @@ function openBookReader(item) {
       })
       .then((buffer) => {
         epubBook = window.ePub(buffer);
-        const rendition = epubBook.renderTo(el.readerEpub, { width: "100%", height: "100%" });
+        const rendition = epubBook.renderTo(el.readerEpub, {
+          width: "100%",
+          height: "100%",
+          flow: readerLayoutMode === "continuous" ? "scrolled-doc" : "paginated",
+        });
         epubRendition = rendition;
         applyEpubReaderTheme();
         rendition.on("relocated", (loc) => {

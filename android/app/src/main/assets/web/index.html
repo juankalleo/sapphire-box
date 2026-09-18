@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Sapphire Box</title>
 <link rel="icon" type="image/png" href="assets/favicons/sapphire-box-favicon.png">
 <link rel="stylesheet" href="styles.css?v=20260911-manual">
@@ -169,11 +169,14 @@
             <p class="title">Deu ruim</p>
             <p class="desc"></p>
           </div>
-          <div class="skeleton-grid" id="state-loading" hidden>
-            <div class="skeleton-card"><div class="skeleton-cover"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
-            <div class="skeleton-card"><div class="skeleton-cover"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
-            <div class="skeleton-card"><div class="skeleton-cover"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
-            <div class="skeleton-card"><div class="skeleton-cover"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+          <div id="state-loading" hidden>
+            <div class="loading-banner"><span class="spinner"></span>Buscando…</div>
+            <div class="skeleton-grid">
+              <div class="skeleton-card"><div class="skeleton-cover"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+              <div class="skeleton-card"><div class="skeleton-cover"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+              <div class="skeleton-card"><div class="skeleton-cover"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+              <div class="skeleton-card"><div class="skeleton-cover"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+            </div>
           </div>
 
           <div class="grid" id="grid"></div>
@@ -271,7 +274,10 @@
               </div>
               <div class="reader-strip" id="reader-pdf-strip" hidden></div>
               <pre id="reader-text" hidden></pre>
-              <div id="reader-epub" hidden></div>
+              <div id="reader-epub" hidden>
+                <button type="button" class="reader-nav prev" id="reader-epub-prev" aria-label="Página anterior">‹</button>
+                <button type="button" class="reader-nav next" id="reader-epub-next" aria-label="Próxima página">›</button>
+              </div>
               <div class="state" id="reader-empty" hidden>
                 <p class="title">Nada pra ler ainda</p>
                 <p class="desc"></p>

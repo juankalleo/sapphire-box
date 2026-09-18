@@ -179,6 +179,12 @@ body{
 #state-error p.desc{color:#e5484d;}
 
 /* ---- skeleton ---- */
+.loading-banner{display:flex; align-items:center; gap:10px; margin-bottom:16px; color:var(--text-secondary); font-size:13px; font-weight:600;}
+.spinner{
+  width:16px; height:16px; flex-shrink:0; border-radius:50%; border:2px solid var(--border);
+  border-top-color:var(--brand); animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
 .skeleton-grid{display:grid; gap:20px; grid-template-columns:repeat(auto-fill, minmax(160px,1fr));}
 .skeleton-card{border-radius:8px; background:var(--surface-alt); border:1px solid var(--border); padding:12px;}
 .skeleton-cover{width:100%; aspect-ratio:2/3; border-radius:6px; background:var(--border); animation:pulse 1.4s ease-in-out infinite;}
@@ -540,7 +546,7 @@ body{
   margin:14px auto; padding:34px 42px; color:#ededf0; background:#1b1b1e;
   border:1px solid #34343a; border-radius:6px;
 }
-#reader-epub{width:100%; height:100%; padding:12px; background:#151516;}
+#reader-epub{position:relative; width:100%; height:100%; padding:12px; background:#151516;}
 .reader.reader-paper .reader-viewer{background:#e9e1d4;}
 .reader.reader-paper #reader-text{
   color:#201915; background:#f6f1e8; border-color:#dccfbd; box-shadow:0 2px 18px rgba(57,42,27,.12);

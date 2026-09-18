@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import time
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -9,6 +10,13 @@ import httpx
 
 from sapphirebox.core.downloader import safe_filename
 from sapphirebox.core.models import Book, BookFileOption
+
+# LibGen's file CDN in particular is flaky enough that a plain retry with
+# a short backoff turns most "server error 503" reports into a download
+# that just quietly works on the second or third try — the same book/link
+# frequently succeeds moments later with no other change.
+_RETRYABLE_STATUS = {502, 503, 504}
+_MAX_DOWNLOAD_ATTEMPTS = 3
 
 _SIZE_RE = re.compile(r"(?P<num>\d+(?:[.,]\d+)?)\s*(?P<unit>kb|mb|gb|b)\b", re.IGNORECASE)
 _CONTENT_RANGE_RE = re.compile(r"/(\d+)\s*$")
@@ -123,6 +131,28 @@ def download_direct_file(
     if on_progress:
         on_progress(3, f"Baixando {option.format.upper()}...")
 
+    for attempt in range(1, _MAX_DOWNLOAD_ATTEMPTS + 1):
+        try:
+            return _download_once(client, book, option, dest_dir, headers, on_progress)
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            if status not in _RETRYABLE_STATUS or attempt == _MAX_DOWNLOAD_ATTEMPTS:
+                raise
+            if on_progress:
+                on_progress(3, f"Servidor ocupado (erro {status}), tentando de novo ({attempt}/{_MAX_DOWNLOAD_ATTEMPTS})...")
+            time.sleep(1.5 * attempt)
+
+    raise AssertionError("unreachable")  # loop always returns or raises
+
+
+def _download_once(
+    client: httpx.Client,
+    book: Book,
+    option: BookFileOption,
+    dest_dir: Path,
+    headers: dict[str, str] | None,
+    on_progress,
+) -> Book:
     size = 0
     path: Path | None = None
     with client.stream("GET", option.url, headers=headers) as resp:

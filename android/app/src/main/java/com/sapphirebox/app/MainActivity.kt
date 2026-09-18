@@ -281,6 +281,20 @@ class MainActivity : AppCompatActivity() {
         WindowInsetsControllerCompat(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
     }
 
+    // A well-documented WebView quirk: after a native AlertDialog (the
+    // confirm()/alert()/prompt() ones above), a Settings screen, or just
+    // backgrounding the app steals window focus and gives it back, the
+    // WebView can be left in a state where tapping a text input no longer
+    // raises the soft keyboard at all — only reloading the page or
+    // restarting the app brought it back. Explicitly reclaiming focus
+    // whenever the window becomes active again is the standard fix.
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            webView.post { webView.requestFocus() }
+        }
+    }
+
     private fun loadBundledApp() {
         setupForm.visibility = View.GONE
         webView.visibility = View.VISIBLE

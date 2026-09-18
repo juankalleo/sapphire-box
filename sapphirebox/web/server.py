@@ -8,7 +8,9 @@ for search + a unified library + basic settings.
 """
 from __future__ import annotations
 
+import base64
 import mimetypes
+import re
 import shutil
 from pathlib import Path
 
@@ -510,6 +512,46 @@ def book_text(id: str = Query(...)) -> dict:
         return reader_service.book_text_content(id)
     except Exception as exc:
         raise HTTPException(status_code=415, detail=str(exc)) from exc
+
+
+_DATA_URL_RE = re.compile(r"^data:image/(jpeg|jpg|png|webp);base64,(.+)$", re.DOTALL)
+
+
+@app.post("/api/library/books/cover")
+def save_book_cover(payload: dict = Body(...)) -> dict:
+    """PDFs (and anything else pdf.js/epub.js can open but Python can't
+    rasterize without a heavy new dependency this app can't safely add for
+    Android) get their cover generated client-side — the reader already
+    renders page 1 to a canvas to display it, so the frontend hands that
+    same render back here as a data URL to save once, instead of doing it
+    on every library load."""
+    book_id = (payload or {}).get("id", "").strip()
+    data_url = (payload or {}).get("dataUrl", "")
+    if not book_id or not data_url:
+        raise HTTPException(status_code=400, detail="id e dataUrl são obrigatórios")
+
+    match = _DATA_URL_RE.match(data_url)
+    if not match:
+        raise HTTPException(status_code=400, detail="dataUrl inválida")
+    ext = "jpg" if match.group(1) in ("jpeg", "jpg") else match.group(1)
+    try:
+        raw = base64.b64decode(match.group(2))
+    except (ValueError, base64.binascii.Error) as exc:
+        raise HTTPException(status_code=400, detail=f"base64 inválido: {exc}") from exc
+
+    path = reader_service.book_file_path(book_id)
+    if path is None:
+        raise HTTPException(status_code=404, detail="livro não encontrado")
+
+    cover_path = path.with_suffix(f".cover.{ext}")
+    cover_path.write_bytes(raw)
+
+    book = repository.get_book_by_id(book_id)
+    if book is not None:
+        book.cover_path = str(cover_path)
+        repository.upsert_book(book)
+
+    return {"coverPath": str(cover_path)}
 
 
 @app.get("/api/library/books/archive/pages")
